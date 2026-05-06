@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"testing"
 	"youtube-downloader/internal/downloader"
 )
@@ -16,6 +17,10 @@ func (m *mockService) Download(v *downloader.Video, q string) ([]byte, error) {
 }
 
 func TestDownloaderUseCase(t *testing.T) {
+	t.Cleanup(func() {
+		_ = os.Remove("test.mp4")
+	})
+
 	service := &mockService{}
 	uc := NewDownloadUseCase(service)
 
