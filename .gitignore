@@ -33,3 +33,6 @@ go.work.sum
 
 # Output videos
 *.mp4
+
+tmp/
+cmd/cli/tmp/
