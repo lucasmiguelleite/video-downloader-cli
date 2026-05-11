@@ -70,11 +70,12 @@ func main() {
 		usecase = app.NewDownloadUseCase(ytClient)
 	}
 
-	err = usecase.Execute(input.URL, input.Quality)
+	path, err := usecase.Execute(input.URL, input.Quality)
 	if err != nil {
 		fmt.Println("Erro ao baixar vídeo:", err)
 		os.Exit(1)
 	}
 
 	fmt.Println("Download concluído com sucesso!")
+	fmt.Printf("Salvo em: %s\n", path)
 }

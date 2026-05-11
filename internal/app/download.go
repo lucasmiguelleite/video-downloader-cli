@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/fs"
@@ -20,25 +21,29 @@ func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCas
 	return &DownloadUseCase{service: s, dir: dir}
 }
 
-func (uc *DownloadUseCase) Execute(url, quality string) error {
+func (uc *DownloadUseCase) Execute(url, quality string) (string, error) {
 	video, err := uc.service.GetVideo(url)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	data, err := uc.service.Download(video, quality)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	dir := uc.dir
 	if dir == "" {
 		dir, err = fs.DefaultDownloadDir()
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
 	filename := fmt.Sprintf("%s.mp4", video.Title)
-	return fs.Save(dir, filename, data)
+	if err := fs.Save(dir, filename, data); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, filename), nil
 }

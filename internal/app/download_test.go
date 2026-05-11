@@ -23,14 +23,18 @@ func TestDownloaderUseCase(t *testing.T) {
 	service := &mockService{}
 	uc := NewDownloadUseCaseWithDir(service, dir)
 
-	err := uc.Execute("url", "720p")
+	path, err := uc.Execute("url", "720p")
 
 	if err != nil {
 		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
 	}
 
-	file := filepath.Join(dir, "test.mp4")
-	content, err := os.ReadFile(file)
+	expectedPath := filepath.Join(dir, "test.mp4")
+	if path != expectedPath {
+		t.Errorf("caminho esperado '%s', recebeu '%s'", expectedPath, path)
+	}
+
+	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("arquivo não foi criado: %v", err)
 	}
