@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"youtube-downloader/internal/downloader"
 )
@@ -17,16 +18,24 @@ func (m *mockService) Download(v *downloader.Video, q string) ([]byte, error) {
 }
 
 func TestDownloaderUseCase(t *testing.T) {
-	t.Cleanup(func() {
-		_ = os.Remove("test.mp4")
-	})
+	dir := t.TempDir()
 
 	service := &mockService{}
-	uc := NewDownloadUseCase(service)
+	uc := NewDownloadUseCaseWithDir(service, dir)
 
 	err := uc.Execute("url", "720p")
 
 	if err != nil {
 		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+	}
+
+	file := filepath.Join(dir, "test.mp4")
+	content, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("arquivo não foi criado: %v", err)
+	}
+
+	if string(content) != "fake" {
+		t.Errorf("conteúdo incorreto")
 	}
 }

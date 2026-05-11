@@ -1,4 +1,3 @@
-// Package app contains the application logic for the YouTube downloader. It defines use cases that orchestrate the interactions between the downloader service and the file system.
 package app
 
 import (
@@ -10,10 +9,15 @@ import (
 
 type DownloadUseCase struct {
 	service downloader.Service
+	dir     string
 }
 
 func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
-	return &DownloadUseCase{s}
+	return &DownloadUseCase{service: s}
+}
+
+func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCase {
+	return &DownloadUseCase{service: s, dir: dir}
 }
 
 func (uc *DownloadUseCase) Execute(url, quality string) error {
@@ -27,6 +31,14 @@ func (uc *DownloadUseCase) Execute(url, quality string) error {
 		return err
 	}
 
+	dir := uc.dir
+	if dir == "" {
+		dir, err = fs.DefaultDownloadDir()
+		if err != nil {
+			return err
+		}
+	}
+
 	filename := fmt.Sprintf("%s.mp4", video.Title)
-	return fs.Save(filename, data)
+	return fs.Save(dir, filename, data)
 }
