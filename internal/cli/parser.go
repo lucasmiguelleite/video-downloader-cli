@@ -6,11 +6,12 @@ import (
 	"os"
 )
 
-const Version = "0.0.1"
+const Version = "0.0.5"
 
 type Input struct {
 	URL         string
 	Quality     string
+	OutputDir   string
 	ShowHelp    bool
 	ShowVersion bool
 }
@@ -20,6 +21,7 @@ func ParseArgs(args []string) (Input, error) {
 
 	url := fs.String("url", "", "URL do vídeo do YouTube")
 	quality := fs.String("resolution", "720p", "Resolução do vídeo (ex: 360p, 480p, 720p, 1080p)")
+	outputDir := fs.String("output", "", "Diretório para salvar o vídeo (padrão: ~/Downloads)")
 	showHelp := fs.Bool("help", false, "Exibe a ajuda")
 	showVersion := fs.Bool("version", false, "Exibe a versão")
 
@@ -39,6 +41,7 @@ func ParseArgs(args []string) (Input, error) {
 	input := Input{
 		URL:         *url,
 		Quality:     *quality,
+		OutputDir:   *outputDir,
 		ShowHelp:    *showHelp,
 		ShowVersion: *showVersion,
 	}

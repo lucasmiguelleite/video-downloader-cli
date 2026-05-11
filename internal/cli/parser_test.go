@@ -76,6 +76,34 @@ func TestParseArgs_EmptyURL(t *testing.T) {
 	}
 }
 
+func TestParseArgs_OutputDir(t *testing.T) {
+	args := []string{"--url", "http://video", "--output", "/tmp/videos"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+	}
+
+	if input.OutputDir != "/tmp/videos" {
+		t.Errorf("OutputDir esperado '/tmp/videos', recebeu '%s'", input.OutputDir)
+	}
+}
+
+func TestParseArgs_DefaultOutputDir(t *testing.T) {
+	args := []string{"--url", "http://video"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+	}
+
+	if input.OutputDir != "" {
+		t.Errorf("OutputDir padrão deveria ser vazio, recebeu '%s'", input.OutputDir)
+	}
+}
+
 func TestParseArgs_InvalidFlag(t *testing.T) {
 	args := []string{"--flag-inexistente"}
 

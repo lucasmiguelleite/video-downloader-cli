@@ -27,12 +27,14 @@ func main() {
 		fmt.Println("Flags:")
 		fmt.Println("  --url <URL>         URL do vídeo do YouTube (obrigatório)")
 		fmt.Println("  --resolution <res>  Resolução do vídeo (padrão: 720p)")
+		fmt.Println("  --output <dir>      Diretório para salvar o vídeo (padrão: ~/Downloads)")
 		fmt.Println("  --help              Exibe esta ajuda")
 		fmt.Println("  --version           Exibe a versão")
 		fmt.Println()
 		fmt.Println("Exemplos:")
 		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx'")
 		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx' --resolution 1080p")
+		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx' --output ~/Videos")
 		os.Exit(0)
 	}
 
@@ -60,7 +62,13 @@ func main() {
 
 	api := youtube.NewRealAPI()
 	ytClient := youtube.NewClient(api)
-	usecase := app.NewDownloadUseCase(ytClient)
+
+	var usecase *app.DownloadUseCase
+	if input.OutputDir != "" {
+		usecase = app.NewDownloadUseCaseWithDir(ytClient, input.OutputDir)
+	} else {
+		usecase = app.NewDownloadUseCase(ytClient)
+	}
 
 	err = usecase.Execute(input.URL, input.Quality)
 	if err != nil {
