@@ -11,7 +11,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-const concurrency = 8
+const concurrency = 20
 
 var videoIDRegex = regexp.MustCompile(`kick\.com/\w+/videos/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
 
