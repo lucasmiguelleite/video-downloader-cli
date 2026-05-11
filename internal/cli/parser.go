@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const Version = "0.0.6"
+const Version = "0.1.0"
 
 type Input struct {
 	URL         string
