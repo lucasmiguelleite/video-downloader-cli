@@ -11,16 +11,22 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-const concurrency = 20
-
 var videoIDRegex = regexp.MustCompile(`kick\.com/\w+/videos/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
 
 type Client struct {
-	api KickAPI
+	api         KickAPI
+	concurrency int
 }
 
 func NewClient(api KickAPI) *Client {
-	return &Client{api: api}
+	return &Client{api: api, concurrency: 20}
+}
+
+func NewClientWithConcurrency(api KickAPI, concurrency int) *Client {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	return &Client{api: api, concurrency: concurrency}
 }
 
 func (c *Client) GetVideo(url string) (*downloader.Video, error) {
@@ -72,8 +78,8 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 		"Downloading",
 	)
 
-	for batchStart := 0; batchStart < len(segments); batchStart += concurrency {
-		batchEnd := batchStart + concurrency
+	for batchStart := 0; batchStart < len(segments); batchStart += c.concurrency {
+		batchEnd := batchStart + c.concurrency
 		if batchEnd > len(segments) {
 			batchEnd = len(segments)
 		}

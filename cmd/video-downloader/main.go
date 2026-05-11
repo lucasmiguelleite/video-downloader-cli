@@ -31,6 +31,7 @@ func main() {
 		fmt.Println("  --url <URL>         Video URL (required) — supports YouTube and Kick")
 		fmt.Println("  --resolution <res>  Video resolution (default: 720p)")
 		fmt.Println("  --output <dir>      Directory to save the video (default: ~/Downloads)")
+		fmt.Println("  --concurrency <N>   Parallel segment downloads — Kick only (default: 20)")
 		fmt.Println("  --help              Show this help")
 		fmt.Println("  --version           Show version")
 		fmt.Println()
@@ -64,7 +65,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	service := resolveService(input.URL)
+	service := resolveService(input.URL, input.Concurrency)
 	isKick := strings.Contains(input.URL, "kick.com")
 
 	var usecase *app.DownloadUseCase
@@ -88,9 +89,9 @@ func main() {
 	fmt.Printf("Saved to: %s\n", path)
 }
 
-func resolveService(url string) downloader.Service {
+func resolveService(url string, concurrency int) downloader.Service {
 	if strings.Contains(url, "kick.com") {
-		return kick.NewClient(kick.NewRealAPI())
+		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency)
 	}
 	return youtube.NewClient(youtube.NewRealAPI())
 }

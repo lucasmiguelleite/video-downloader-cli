@@ -104,6 +104,34 @@ func TestParseArgs_DefaultOutputDir(t *testing.T) {
 	}
 }
 
+func TestParseArgs_Concurrency(t *testing.T) {
+	args := []string{"--url", "http://video", "--concurrency", "10"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if input.Concurrency != 10 {
+		t.Errorf("expected Concurrency 10, got %d", input.Concurrency)
+	}
+}
+
+func TestParseArgs_DefaultConcurrency(t *testing.T) {
+	args := []string{"--url", "http://video"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if input.Concurrency != 20 {
+		t.Errorf("default Concurrency should be 20, got %d", input.Concurrency)
+	}
+}
+
 func TestParseArgs_InvalidFlag(t *testing.T) {
 	args := []string{"--flag-inexistente"}
 
