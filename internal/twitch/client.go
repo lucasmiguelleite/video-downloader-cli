@@ -1,4 +1,4 @@
-package kick
+package twitch
 
 import (
 	"fmt"
@@ -12,18 +12,18 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-var videoIDRegex = regexp.MustCompile(`kick\.com/\w+/videos/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
+var vodIDRegex = regexp.MustCompile(`twitch\.tv/(?:[^/]+/v(?:ideo)?|videos)/(\d+)|twitch\.tv/.*[?&]video=v?(\d+)`)
 
 type Client struct {
-	api         KickAPI
+	api         TwitchAPI
 	concurrency int
 }
 
-func NewClient(api KickAPI) *Client {
+func NewClient(api TwitchAPI) *Client {
 	return &Client{api: api, concurrency: 20}
 }
 
-func NewClientWithConcurrency(api KickAPI, concurrency int) *Client {
+func NewClientWithConcurrency(api TwitchAPI, concurrency int) *Client {
 	if concurrency < 1 {
 		concurrency = 1
 	}
@@ -31,34 +31,39 @@ func NewClientWithConcurrency(api KickAPI, concurrency int) *Client {
 }
 
 func (c *Client) GetVideo(url string) (*downloader.Video, error) {
-	matches := videoIDRegex.FindStringSubmatch(url)
-	if len(matches) < 2 {
-		return nil, fmt.Errorf("invalid Kick VOD URL: %s", url)
+	vodID := extractVodID(url)
+	if vodID == "" {
+		return nil, fmt.Errorf("invalid Twitch VOD URL: %s", url)
 	}
 
-	videoID := matches[1]
-
-	info, err := c.api.FetchVideoInfo(videoID)
+	info, err := c.api.FetchVideoInfo(vodID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &downloader.Video{
 		Title: info.Title,
-		URL:   info.SourceURL,
+		URL:   vodID,
 	}, nil
 }
 
 func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) error {
-	playlist, err := c.api.FetchPlaylist(video.URL)
+	token, err := c.api.FetchAccessToken(video.URL)
 	if err != nil {
 		return err
 	}
 
-	segmentURL := video.URL
+	usherURL := BuildUsherURL(video.URL, token)
+
+	playlist, err := c.api.FetchPlaylist(usherURL)
+	if err != nil {
+		return err
+	}
+
+	segmentURL := usherURL
 
 	if hls.IsMasterPlaylist(playlist) {
-		segmentURL = hls.SelectVariant(video.URL, playlist, quality)
+		segmentURL = hls.SelectVariant(usherURL, playlist, quality)
 		if segmentURL == "" {
 			return fmt.Errorf("no matching variant found for quality %s", quality)
 		}
@@ -74,10 +79,7 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 		return fmt.Errorf("no segments found in playlist")
 	}
 
-	bar := progressbar.DefaultBytes(
-		-1,
-		"Downloading",
-	)
+	bar := progressbar.DefaultBytes(-1, "Downloading")
 
 	for batchStart := 0; batchStart < len(segments); batchStart += c.concurrency {
 		batchEnd := batchStart + c.concurrency
@@ -121,4 +123,14 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 	}
 
 	return nil
+}
+
+func extractVodID(url string) string {
+	matches := vodIDRegex.FindStringSubmatch(url)
+	for i := 1; i < len(matches); i++ {
+		if matches[i] != "" {
+			return matches[i]
+		}
+	}
+	return ""
 }

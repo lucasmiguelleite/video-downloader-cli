@@ -1,4 +1,4 @@
-package kick
+package hls
 
 import (
 	"bufio"
@@ -34,10 +34,9 @@ func ParseVariants(baseURL, playlist string) []Variant {
 			continue
 		}
 
-		variantURL := resolveURL(base, line)
 		variants = append(variants, Variant{
 			Resolution: currentRes,
-			URL:        variantURL,
+			URL:        resolveURL(base, line),
 		})
 	}
 

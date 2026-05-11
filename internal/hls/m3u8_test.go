@@ -1,4 +1,4 @@
-package kick
+package hls
 
 import "testing"
 

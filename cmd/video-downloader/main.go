@@ -9,6 +9,7 @@ import (
 	"youtube-downloader/internal/cli"
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/kick"
+	"youtube-downloader/internal/twitch"
 	"youtube-downloader/internal/youtube"
 )
 
@@ -23,23 +24,24 @@ func main() {
 
 	if input.ShowHelp {
 		fmt.Printf("video-downloader v%s\n\n", cli.Version)
-		fmt.Println("Download videos from YouTube and Kick from the command line.")
+		fmt.Println("Download videos from YouTube, Twitch, and Kick from the command line.")
 		fmt.Println()
 		fmt.Println("Usage: video-downloader --url <URL> [--resolution <resolution>]")
 		fmt.Println()
 		fmt.Println("Flags:")
-		fmt.Println("  --url <URL>         Video URL (required) — supports YouTube and Kick")
+		fmt.Println("  --url <URL>         Video URL (required) — YouTube, Twitch, Kick")
 		fmt.Println("  --resolution <res>  Video resolution (default: 720p)")
 		fmt.Println("  --output <dir>      Directory to save the video (default: ~/Downloads)")
-		fmt.Println("  --concurrency <N>   Parallel segment downloads — Kick only (default: 20)")
+		fmt.Println("  --concurrency <N>   Parallel segment downloads for HLS streams (default: 20)")
 		fmt.Println("  --help              Show this help")
 		fmt.Println("  --version           Show version")
 		fmt.Println()
 		fmt.Println("Examples:")
 		fmt.Println("  video-downloader --url 'https://youtube.com/watch?v=xxx'")
+		fmt.Println("  video-downloader --url 'https://twitch.tv/videos/1234567890'")
 		fmt.Println("  video-downloader --url 'https://kick.com/nitrao/videos/7b0877f1-983d-4c5f-932e-cda88e8196f1'")
 		fmt.Println("  video-downloader --url 'https://youtube.com/watch?v=xxx' --resolution 1080p")
-		fmt.Println("  video-downloader --url 'https://youtube.com/watch?v=xxx' --output ~/Videos")
+		fmt.Println("  video-downloader --url 'https://twitch.tv/videos/1234567890' --output ~/Videos")
 		os.Exit(0)
 	}
 
@@ -65,13 +67,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	service := resolveService(input.URL, input.Concurrency)
-	isKick := strings.Contains(input.URL, "kick.com")
+	service, needsRemux := resolveService(input.URL, input.Concurrency)
 
 	var usecase *app.DownloadUseCase
-	if isKick && input.OutputDir != "" {
+	if needsRemux && input.OutputDir != "" {
 		usecase = app.NewDownloadUseCaseWithRemux(service, input.OutputDir)
-	} else if isKick {
+	} else if needsRemux {
 		usecase = app.NewDownloadUseCaseWithRemux(service, "")
 	} else if input.OutputDir != "" {
 		usecase = app.NewDownloadUseCaseWithDir(service, input.OutputDir)
@@ -89,9 +90,12 @@ func main() {
 	fmt.Printf("Saved to: %s\n", path)
 }
 
-func resolveService(url string, concurrency int) downloader.Service {
+func resolveService(url string, concurrency int) (downloader.Service, bool) {
 	if strings.Contains(url, "kick.com") {
-		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency)
+		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency), true
 	}
-	return youtube.NewClient(youtube.NewRealAPI())
+	if strings.Contains(url, "twitch.tv") {
+		return twitch.NewClientWithConcurrency(twitch.NewRealAPI(), concurrency), true
+	}
+	return youtube.NewClient(youtube.NewRealAPI()), false
 }

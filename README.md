@@ -1,6 +1,6 @@
 # video-downloader
 
-A Go CLI to download videos from YouTube and Kick from the command line.
+A Go CLI to download videos from YouTube, Twitch, and Kick from the command line.
 
 ## Installation
 
@@ -21,7 +21,7 @@ go build -o bin/video-downloader ./cmd/video-downloader/
 ## Prerequisites
 
 - **Go 1.26+**
-- **ffmpeg** — required for Kick VOD downloads (converts HLS `.ts` segments to `.mp4`)
+- **ffmpeg** — required for Twitch and Kick VOD downloads (converts HLS `.ts` segments to `.mp4`)
   ```bash
   brew install ffmpeg
   ```
@@ -32,6 +32,9 @@ go build -o bin/video-downloader ./cmd/video-downloader/
 # YouTube
 video-downloader --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
+# Twitch VOD
+video-downloader --url 'https://www.twitch.tv/videos/1234567890'
+
 # Kick VOD
 video-downloader --url 'https://kick.com/nitrao/videos/7b0877f1-983d-4c5f-932e-cda88e8196f1'
 
@@ -39,7 +42,10 @@ video-downloader --url 'https://kick.com/nitrao/videos/7b0877f1-983d-4c5f-932e-c
 video-downloader --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --resolution 1080p
 
 # Custom output directory
-video-downloader --url 'https://youtube.com/watch?v=xxx' --output ~/Videos
+video-downloader --url 'https://twitch.tv/videos/1234567890' --output ~/Videos
+
+# Adjust concurrency for HLS streams
+video-downloader --url 'https://twitch.tv/videos/1234567890' --concurrency 10
 
 # Show help
 video-downloader --help
@@ -52,9 +58,10 @@ video-downloader --version
 
 | Flag | Description | Default |
 |---|---|---|
-| `--url` | Video URL — supports YouTube and Kick (required) | — |
+| `--url` | Video URL — YouTube, Twitch, Kick (required) | — |
 | `--resolution` | Video resolution | `720p` |
 | `--output` | Directory to save the video | `~/Downloads` |
+| `--concurrency` | Parallel segment downloads (Twitch/Kick) | `20` |
 | `--help` | Show help | — |
 | `--version` | Show version | — |
 
@@ -89,7 +96,9 @@ internal/
   cli/                   # Argument parser and terminal utilities
   downloader/            # Download service interface
   fs/                    # File system operations
-  kick/                  # Kick VOD client (HLS/m3u8)
+  hls/                   # Shared HLS/m3u8 parser
+  kick/                  # Kick VOD client
+  twitch/                # Twitch VOD client (GraphQL + HLS)
   youtube/               # YouTube API client
 ```
 
