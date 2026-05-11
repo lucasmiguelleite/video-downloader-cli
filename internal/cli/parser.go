@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-const Version = "0.2.0"
+var Version = "dev"
 
 type Input struct {
 	URL         string
