@@ -68,7 +68,7 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 	}
 
 	bar := progressbar.DefaultBytes(
-		int64(len(segments)),
+		-1,
 		"Downloading",
 	)
 
@@ -109,7 +109,7 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 
 		for _, data := range results {
 			w.Write(data)
-			bar.Add(1)
+			bar.Add(len(data))
 		}
 	}
 
