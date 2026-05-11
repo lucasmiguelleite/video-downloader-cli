@@ -36,11 +36,11 @@ func TestGetVideo(t *testing.T) {
 	video, err := client.GetVideo("http://test")
 
 	if err != nil {
-		t.Fatalf("não esperava erro")
+		t.Fatalf("expected no error")
 	}
 
 	if video.Title != "test-video" {
-		t.Errorf("título incorreto")
+		t.Errorf("incorrect title")
 	}
 }
 
@@ -54,10 +54,10 @@ func TestDownload(t *testing.T) {
 	data, err := client.Download(video, "720p")
 
 	if err != nil {
-		t.Fatalf("não esperava erro: %v", err)
+		t.Fatalf("expected no error: %v", err)
 	}
 
 	if string(data) != "fake video data" {
-		t.Errorf("conteúdo inválido")
+		t.Errorf("invalid content")
 	}
 }

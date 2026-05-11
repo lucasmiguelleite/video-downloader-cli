@@ -11,16 +11,16 @@ func TestSave(t *testing.T) {
 
 	err := Save(dir, "test.mp4", []byte("fake data"))
 	if err != nil {
-		t.Fatalf("erro ao salvar: %v", err)
+		t.Fatalf("error saving: %v", err)
 	}
 
 	content, err := os.ReadFile(filepath.Join(dir, "test.mp4"))
 	if err != nil {
-		t.Fatalf("erro ao ler: %v", err)
+		t.Fatalf("error reading: %v", err)
 	}
 
 	if string(content) != "fake data" {
-		t.Errorf("conteúdo incorreto")
+		t.Errorf("incorrect content")
 	}
 }
 
@@ -30,24 +30,24 @@ func TestSave_CreatesDir(t *testing.T) {
 
 	err := Save(dir, "test.mp4", []byte("data"))
 	if err != nil {
-		t.Fatalf("erro ao salvar em diretório inexistente: %v", err)
+		t.Fatalf("error saving to nonexistent directory: %v", err)
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, "test.mp4")); os.IsNotExist(err) {
-		t.Error("arquivo não foi criado")
+		t.Error("file was not created")
 	}
 }
 
 func TestDefaultDownloadDir(t *testing.T) {
 	dir, err := DefaultDownloadDir()
 	if err != nil {
-		t.Fatalf("erro ao obter diretório de downloads: %v", err)
+		t.Fatalf("error getting download directory: %v", err)
 	}
 
 	home, _ := os.UserHomeDir()
 	expected := filepath.Join(home, "Downloads")
 
 	if dir != expected {
-		t.Errorf("esperava '%s', recebeu '%s'", expected, dir)
+		t.Errorf("expected '%s', got '%s'", expected, dir)
 	}
 }

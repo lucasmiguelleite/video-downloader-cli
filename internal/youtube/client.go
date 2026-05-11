@@ -34,10 +34,10 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 		return nil, err
 	}
 
-	// pegar formatos com áudio
+	// get formats with audio
 	formats := v.Formats.WithAudioChannels()
 	if len(formats) == 0 {
-		return nil, fmt.Errorf("nenhum formato com áudio encontrado")
+		return nil, fmt.Errorf("no format with audio found")
 	}
 
 	format := &formats[0]
@@ -51,7 +51,7 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 	// 👇 cria barra de progresso
 	bar := progressbar.DefaultBytes(
 		size,
-		"Baixando",
+		"Downloading",
 	)
 
 	// 👇 junta stream + barra
@@ -63,7 +63,7 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 		return nil, err
 	}
 
-	fmt.Println("\nDownload finalizado!")
+	fmt.Println("\nDownload complete!")
 
 	return data, nil
 }

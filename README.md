@@ -1,8 +1,8 @@
 # youtube-downloader
 
-CLI em Go para baixar vídeos do YouTube via linha de comando.
+A Go CLI to download YouTube videos from the command line.
 
-## Instalação
+## Installation
 
 ### Via `go install`
 
@@ -10,7 +10,7 @@ CLI em Go para baixar vídeos do YouTube via linha de comando.
 go install ./cmd/youtube-downloader/
 ```
 
-O binário fica disponível em `$GOPATH/bin` (ou `$HOME/go/bin`).
+The binary becomes available at `$GOPATH/bin` (or `$HOME/go/bin`).
 
 ### Via `go build`
 
@@ -18,46 +18,50 @@ O binário fica disponível em `$GOPATH/bin` (ou `$HOME/go/bin`).
 go build -o bin/youtube-downloader ./cmd/youtube-downloader/
 ```
 
-## Uso
+## Usage
 
 ```bash
-# Baixar com resolução padrão (720p)
+# Download with default resolution (720p)
 youtube-downloader --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
-# Especificar resolução
+# Specify resolution
 youtube-downloader --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --resolution 1080p
 
-# Ver ajuda
+# Custom output directory
+youtube-downloader --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' --output ~/Videos
+
+# Show help
 youtube-downloader --help
 
-# Ver versão
+# Show version
 youtube-downloader --version
 ```
 
 ### Flags
 
-| Flag | Descrição | Padrão |
+| Flag | Description | Default |
 |---|---|---|
-| `--url` | URL do vídeo do YouTube (obrigatório) | — |
-| `--resolution` | Resolução do vídeo | `720p` |
-| `--help` | Exibe a ajuda | — |
-| `--version` | Exibe a versão | — |
+| `--url` | YouTube video URL (required) | — |
+| `--resolution` | Video resolution | `720p` |
+| `--output` | Directory to save the video | `~/Downloads` |
+| `--help` | Show help | — |
+| `--version` | Show version | — |
 
-> Se a URL contiver `&`, coloque-a entre aspas simples para evitar problemas com o shell.
+> If the URL contains `&`, wrap it in single quotes to avoid shell issues.
 
-## Desenvolvimento
+## Development
 
-### Pré-requisitos
+### Prerequisites
 
 - Go 1.26+
 
-### Rodando
+### Running
 
 ```bash
 go run ./cmd/youtube-downloader/ --url 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 ```
 
-### Testes
+### Tests
 
 ```bash
 go test ./...
@@ -69,16 +73,16 @@ go test ./...
 go build -o bin/youtube-downloader ./cmd/youtube-downloader/
 ```
 
-## Estrutura do projeto
+## Project structure
 
 ```
 cmd/youtube-downloader/    # Entry point (main)
 internal/
-  app/                     # Casos de uso (regra de negócio)
-  cli/                     # Parser de argumentos e utilitários de terminal
-  downloader/              # Interface do serviço de download
-  fs/                      # Salvar arquivos em disco
-  youtube/                 # Cliente da API do YouTube
+  app/                     # Use cases (business logic)
+  cli/                     # Argument parser and terminal utilities
+  downloader/              # Download service interface
+  fs/                      # File system operations
+  youtube/                 # YouTube API client
 ```
 
-O projeto segue os princípios de Clean Architecture e SOLID, com inversão de dependência entre as camadas.
+The project follows Clean Architecture and SOLID principles, with dependency inversion across layers.

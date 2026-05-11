@@ -10,10 +10,10 @@ import (
 func TestIsRunningInBackground_AlwaysFalse(t *testing.T) {
 	result, err := IsRunningInBackground(os.Stdin)
 	if err != nil {
-		t.Fatalf("não esperava erro: %v", err)
+		t.Fatalf("expected no error: %v", err)
 	}
 
 	if result {
-		t.Error("esperava false em plataformas não-unix")
+		t.Error("expected false on non-unix platforms")
 	}
 }

@@ -8,15 +8,15 @@ func TestParseArgs_URLAndResolution(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if input.URL != "http://video" {
-		t.Errorf("URL esperada 'http://video', recebeu '%s'", input.URL)
+		t.Errorf("expected URL 'http://video', got '%s'", input.URL)
 	}
 
 	if input.Quality != "1080p" {
-		t.Errorf("Resolução esperada '1080p', recebeu '%s'", input.Quality)
+		t.Errorf("expected resolution '1080p', got '%s'", input.Quality)
 	}
 }
 
@@ -26,11 +26,11 @@ func TestParseArgs_DefaultResolution(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if input.Quality != "720p" {
-		t.Errorf("Resolução padrão deve ser 720p, recebeu '%s'", input.Quality)
+		t.Errorf("default resolution should be 720p, got '%s'", input.Quality)
 	}
 }
 
@@ -40,11 +40,11 @@ func TestParseArgs_Help(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if !input.ShowHelp {
-		t.Error("ShowHelp deveria ser true")
+		t.Error("ShowHelp should be true")
 	}
 }
 
@@ -54,11 +54,11 @@ func TestParseArgs_Version(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if !input.ShowVersion {
-		t.Error("ShowVersion deveria ser true")
+		t.Error("ShowVersion should be true")
 	}
 }
 
@@ -68,11 +68,11 @@ func TestParseArgs_EmptyURL(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro no parse, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if input.URL != "" {
-		t.Errorf("URL deveria ser vazia, recebeu '%s'", input.URL)
+		t.Errorf("URL should be empty, got '%s'", input.URL)
 	}
 }
 
@@ -82,11 +82,11 @@ func TestParseArgs_OutputDir(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if input.OutputDir != "/tmp/videos" {
-		t.Errorf("OutputDir esperado '/tmp/videos', recebeu '%s'", input.OutputDir)
+		t.Errorf("expected OutputDir '/tmp/videos', got '%s'", input.OutputDir)
 	}
 }
 
@@ -96,11 +96,11 @@ func TestParseArgs_DefaultOutputDir(t *testing.T) {
 	input, err := ParseArgs(args)
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	if input.OutputDir != "" {
-		t.Errorf("OutputDir padrão deveria ser vazio, recebeu '%s'", input.OutputDir)
+		t.Errorf("default OutputDir should be empty, got '%s'", input.OutputDir)
 	}
 }
 
@@ -110,6 +110,6 @@ func TestParseArgs_InvalidFlag(t *testing.T) {
 	_, err := ParseArgs(args)
 
 	if err == nil {
-		t.Error("Esperava erro para flag inválida")
+		t.Error("expected error for invalid flag")
 	}
 }

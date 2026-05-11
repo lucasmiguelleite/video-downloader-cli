@@ -14,24 +14,24 @@ func main() {
 
 	input, err := cli.ParseArgs(args)
 	if err != nil {
-		fmt.Println("Erro:", err)
+		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
 	if input.ShowHelp {
 		fmt.Printf("youtube-downloader v%s\n\n", cli.Version)
-		fmt.Println("Baixe vídeos do YouTube via linha de comando.")
+		fmt.Println("Download YouTube videos from the command line.")
 		fmt.Println()
-		fmt.Println("Uso: youtube-downloader --url <URL> [--resolution <resolução>]")
+		fmt.Println("Usage: youtube-downloader --url <URL> [--resolution <resolution>]")
 		fmt.Println()
 		fmt.Println("Flags:")
-		fmt.Println("  --url <URL>         URL do vídeo do YouTube (obrigatório)")
-		fmt.Println("  --resolution <res>  Resolução do vídeo (padrão: 720p)")
-		fmt.Println("  --output <dir>      Diretório para salvar o vídeo (padrão: ~/Downloads)")
-		fmt.Println("  --help              Exibe esta ajuda")
-		fmt.Println("  --version           Exibe a versão")
+		fmt.Println("  --url <URL>         YouTube video URL (required)")
+		fmt.Println("  --resolution <res>  Video resolution (default: 720p)")
+		fmt.Println("  --output <dir>      Directory to save the video (default: ~/Downloads)")
+		fmt.Println("  --help              Show this help")
+		fmt.Println("  --version           Show version")
 		fmt.Println()
-		fmt.Println("Exemplos:")
+		fmt.Println("Examples:")
 		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx'")
 		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx' --resolution 1080p")
 		fmt.Println("  youtube-downloader --url 'https://youtube.com/watch?v=xxx' --output ~/Videos")
@@ -44,18 +44,18 @@ func main() {
 	}
 
 	if input.URL == "" {
-		fmt.Println("Erro: flag --url é obrigatória. Use --help para mais informações.")
+		fmt.Println("Error: --url flag is required. Use --help for more information.")
 		os.Exit(1)
 	}
 
 	runningInBackground, err := cli.IsRunningInBackground(os.Stdin)
 	if err != nil {
-		fmt.Println("Erro ao verificar terminal:", err)
+		fmt.Println("Error checking terminal:", err)
 		os.Exit(1)
 	}
 	if runningInBackground {
-		fmt.Fprintln(os.Stderr, "Aviso: o download foi iniciado em segundo plano.")
-		fmt.Fprintln(os.Stderr, "Se a URL tiver '&', coloque a URL inteira entre aspas:")
+		fmt.Fprintln(os.Stderr, "Warning: download started in background.")
+		fmt.Fprintln(os.Stderr, "If the URL contains '&', wrap it in quotes:")
 		fmt.Fprintln(os.Stderr, `  youtube-downloader --url 'https://www.youtube.com/watch?v=gkx519Vi-co&t=2824s'`)
 		os.Exit(1)
 	}
@@ -72,10 +72,10 @@ func main() {
 
 	path, err := usecase.Execute(input.URL, input.Quality)
 	if err != nil {
-		fmt.Println("Erro ao baixar vídeo:", err)
+		fmt.Println("Error downloading video:", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Download concluído com sucesso!")
-	fmt.Printf("Salvo em: %s\n", path)
+	fmt.Println("Download completed successfully!")
+	fmt.Printf("Saved to: %s\n", path)
 }

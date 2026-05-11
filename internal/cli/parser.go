@@ -19,17 +19,17 @@ type Input struct {
 func ParseArgs(args []string) (Input, error) {
 	fs := flag.NewFlagSet("youtube-downloader", flag.ContinueOnError)
 
-	url := fs.String("url", "", "URL do vídeo do YouTube")
-	quality := fs.String("resolution", "720p", "Resolução do vídeo (ex: 360p, 480p, 720p, 1080p)")
-	outputDir := fs.String("output", "", "Diretório para salvar o vídeo (padrão: ~/Downloads)")
-	showHelp := fs.Bool("help", false, "Exibe a ajuda")
-	showVersion := fs.Bool("version", false, "Exibe a versão")
+	url := fs.String("url", "", "YouTube video URL")
+	quality := fs.String("resolution", "720p", "Video resolution (e.g. 360p, 480p, 720p, 1080p)")
+	outputDir := fs.String("output", "", "Directory to save the video (default: ~/Downloads)")
+	showHelp := fs.Bool("help", false, "Show help")
+	showVersion := fs.Bool("version", false, "Show version")
 
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Uso: youtube-downloader --url <URL> [opções]\n\n")
-		fmt.Fprintf(os.Stderr, "Opções:\n")
+		fmt.Fprintf(os.Stderr, "Usage: youtube-downloader --url <URL> [options]\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
 		fs.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExemplos:\n")
+		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  youtube-downloader --url 'https://youtube.com/watch?v=xxx'\n")
 		fmt.Fprintf(os.Stderr, "  youtube-downloader --url 'https://youtube.com/watch?v=xxx' --resolution 1080p\n")
 	}

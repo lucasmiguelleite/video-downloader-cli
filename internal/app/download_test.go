@@ -26,20 +26,20 @@ func TestDownloaderUseCase(t *testing.T) {
 	path, err := uc.Execute("url", "720p")
 
 	if err != nil {
-		t.Fatalf("Não esperava erro, mas recebeu: %v", err)
+		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	expectedPath := filepath.Join(dir, "test.mp4")
 	if path != expectedPath {
-		t.Errorf("caminho esperado '%s', recebeu '%s'", expectedPath, path)
+		t.Errorf("expected path '%s', got '%s'", expectedPath, path)
 	}
 
 	content, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("arquivo não foi criado: %v", err)
+		t.Fatalf("file was not created: %v", err)
 	}
 
 	if string(content) != "fake" {
-		t.Errorf("conteúdo incorreto")
+		t.Errorf("incorrect content")
 	}
 }
