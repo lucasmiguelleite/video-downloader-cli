@@ -78,6 +78,8 @@ func TestDownload_MediaPlaylist(t *testing.T) {
 https://cdn.example.com/seg1.ts
 #EXTINF:10.0,
 https://cdn.example.com/seg2.ts
+#EXTINF:10.0,
+https://cdn.example.com/seg3.ts
 #EXT-X-ENDLIST`
 
 	api := &mockAPI{
@@ -87,6 +89,7 @@ https://cdn.example.com/seg2.ts
 		segments: map[string][]byte{
 			"https://cdn.example.com/seg1.ts": []byte("data1"),
 			"https://cdn.example.com/seg2.ts": []byte("data2"),
+			"https://cdn.example.com/seg3.ts": []byte("data3"),
 		},
 	}
 
@@ -101,7 +104,7 @@ https://cdn.example.com/seg2.ts
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	expected := "data1data2"
+	expected := "data1data2data3"
 	if buf.String() != expected {
 		t.Errorf("expected '%s', got '%s'", expected, buf.String())
 	}

@@ -58,3 +58,18 @@ func TestDefaultDownloadDir(t *testing.T) {
 		t.Errorf("expected '%s', got '%s'", expected, dir)
 	}
 }
+
+func TestRemuxToMP4_NoFFmpeg(t *testing.T) {
+	dir := t.TempDir()
+	fakePath := filepath.Join(dir, "video.mp4")
+	os.WriteFile(fakePath, []byte("fake"), 0644)
+
+	originalPath := os.Getenv("PATH")
+	os.Setenv("PATH", "")
+	defer os.Setenv("PATH", originalPath)
+
+	err := RemuxToMP4(fakePath)
+	if err == nil {
+		t.Error("expected error when ffmpeg is not available")
+	}
+}

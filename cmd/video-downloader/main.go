@@ -65,9 +65,14 @@ func main() {
 	}
 
 	service := resolveService(input.URL)
+	isKick := strings.Contains(input.URL, "kick.com")
 
 	var usecase *app.DownloadUseCase
-	if input.OutputDir != "" {
+	if isKick && input.OutputDir != "" {
+		usecase = app.NewDownloadUseCaseWithRemux(service, input.OutputDir)
+	} else if isKick {
+		usecase = app.NewDownloadUseCaseWithRemux(service, "")
+	} else if input.OutputDir != "" {
 		usecase = app.NewDownloadUseCaseWithDir(service, input.OutputDir)
 	} else {
 		usecase = app.NewDownloadUseCase(service)

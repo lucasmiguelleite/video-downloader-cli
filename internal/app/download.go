@@ -9,8 +9,9 @@ import (
 )
 
 type DownloadUseCase struct {
-	service downloader.Service
-	dir     string
+	service   downloader.Service
+	dir       string
+	needsRemux bool
 }
 
 func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
@@ -19,6 +20,10 @@ func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
 
 func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCase {
 	return &DownloadUseCase{service: s, dir: dir}
+}
+
+func NewDownloadUseCaseWithRemux(s downloader.Service, dir string) *DownloadUseCase {
+	return &DownloadUseCase{service: s, dir: dir, needsRemux: true}
 }
 
 func (uc *DownloadUseCase) Execute(url, quality string) (string, error) {
@@ -47,5 +52,13 @@ func (uc *DownloadUseCase) Execute(url, quality string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(dir, filename), nil
+	path := filepath.Join(dir, filename)
+
+	if uc.needsRemux {
+		if err := fs.RemuxToMP4(path); err != nil {
+			return "", err
+		}
+	}
+
+	return path, nil
 }
