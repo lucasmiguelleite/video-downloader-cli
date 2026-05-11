@@ -1,6 +1,7 @@
 package kick
 
 import (
+	"bytes"
 	"testing"
 
 	"youtube-downloader/internal/downloader"
@@ -90,18 +91,19 @@ https://cdn.example.com/seg2.ts
 	}
 
 	client := NewClient(api)
-	data, err := client.Download(&downloader.Video{
+	var buf bytes.Buffer
+	err := client.Download(&downloader.Video{
 		Title: "Test",
 		URL:   "https://cdn.example.com/video.m3u8",
-	}, "720p")
+	}, "720p", &buf)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	expected := "data1data2"
-	if string(data) != expected {
-		t.Errorf("expected '%s', got '%s'", expected, string(data))
+	if buf.String() != expected {
+		t.Errorf("expected '%s', got '%s'", expected, buf.String())
 	}
 }
 
@@ -131,17 +133,18 @@ https://cdn.example.com/720p/seg2.ts
 	}
 
 	client := NewClient(api)
-	data, err := client.Download(&downloader.Video{
+	var buf bytes.Buffer
+	err := client.Download(&downloader.Video{
 		Title: "Test",
 		URL:   "https://cdn.example.com/master.m3u8",
-	}, "720p")
+	}, "720p", &buf)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
 	expected := "data1data2"
-	if string(data) != expected {
-		t.Errorf("expected '%s', got '%s'", expected, string(data))
+	if buf.String() != expected {
+		t.Errorf("expected '%s', got '%s'", expected, buf.String())
 	}
 }

@@ -27,11 +27,6 @@ func (uc *DownloadUseCase) Execute(url, quality string) (string, error) {
 		return "", err
 	}
 
-	data, err := uc.service.Download(video, quality)
-	if err != nil {
-		return "", err
-	}
-
 	dir := uc.dir
 	if dir == "" {
 		dir, err = fs.DefaultDownloadDir()
@@ -41,7 +36,14 @@ func (uc *DownloadUseCase) Execute(url, quality string) (string, error) {
 	}
 
 	filename := fmt.Sprintf("%s.mp4", video.Title)
-	if err := fs.Save(dir, filename, data); err != nil {
+
+	f, err := fs.Create(dir, filename)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if err := uc.service.Download(video, quality, f); err != nil {
 		return "", err
 	}
 

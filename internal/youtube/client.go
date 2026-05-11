@@ -28,38 +28,35 @@ func (c *Client) GetVideo(url string) (*downloader.Video, error) {
 	}, nil
 }
 
-func (c *Client) Download(video *downloader.Video, quality string) ([]byte, error) {
+func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) error {
 	v, err := c.client.GetVideo(video.URL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// get formats with audio
 	formats := v.Formats.WithAudioChannels()
 	if len(formats) == 0 {
-		return nil, fmt.Errorf("no format with audio found")
+		return fmt.Errorf("no format with audio found")
 	}
 
 	format := &formats[0]
 
 	stream, size, err := c.client.GetStream(v, format)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer stream.Close()
 
 	bar := progressbar.DefaultBytes(
 		size,
 		"Downloading",
 	)
 
-	reader := io.TeeReader(stream, bar)
-
-	data, err := io.ReadAll(reader)
+	_, err = io.Copy(w, io.TeeReader(stream, bar))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	fmt.Println("\nDownload complete!")
-
-	return data, nil
+	return nil
 }

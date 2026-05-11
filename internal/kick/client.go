@@ -1,8 +1,8 @@
 package kick
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"regexp"
 
 	"youtube-downloader/internal/downloader"
@@ -39,10 +39,10 @@ func (c *Client) GetVideo(url string) (*downloader.Video, error) {
 	}, nil
 }
 
-func (c *Client) Download(video *downloader.Video, quality string) ([]byte, error) {
+func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) error {
 	playlist, err := c.api.FetchPlaylist(video.URL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	segmentURL := video.URL
@@ -50,18 +50,18 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 	if IsMasterPlaylist(playlist) {
 		segmentURL = SelectVariant(video.URL, playlist, quality)
 		if segmentURL == "" {
-			return nil, fmt.Errorf("no matching variant found for quality %s", quality)
+			return fmt.Errorf("no matching variant found for quality %s", quality)
 		}
 
 		playlist, err = c.api.FetchPlaylist(segmentURL)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	segments := ParseSegments(segmentURL, playlist)
 	if len(segments) == 0 {
-		return nil, fmt.Errorf("no segments found in playlist")
+		return fmt.Errorf("no segments found in playlist")
 	}
 
 	bar := progressbar.DefaultBytes(
@@ -69,15 +69,14 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 		"Downloading",
 	)
 
-	var buf bytes.Buffer
 	for i, segURL := range segments {
 		data, err := c.api.FetchSegment(segURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to download segment %d: %w", i, err)
+			return fmt.Errorf("failed to download segment %d: %w", i, err)
 		}
-		buf.Write(data)
+		w.Write(data)
 		bar.Add(1)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }

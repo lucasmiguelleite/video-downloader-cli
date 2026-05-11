@@ -51,13 +51,14 @@ func TestDownload(t *testing.T) {
 		URL: "http://test",
 	}
 
-	data, err := client.Download(video, "720p")
+	var buf bytes.Buffer
+	err := client.Download(video, "720p", &buf)
 
 	if err != nil {
 		t.Fatalf("expected no error: %v", err)
 	}
 
-	if string(data) != "fake video data" {
+	if buf.String() != "fake video data" {
 		t.Errorf("invalid content")
 	}
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,8 +14,9 @@ func (m *mockService) GetVideo(url string) (*downloader.Video, error) {
 	return &downloader.Video{Title: "test"}, nil
 }
 
-func (m *mockService) Download(v *downloader.Video, q string) ([]byte, error) {
-	return []byte("fake"), nil
+func (m *mockService) Download(v *downloader.Video, q string, w io.Writer) error {
+	_, err := w.Write([]byte("fake"))
+	return err
 }
 
 func TestDownloaderUseCase(t *testing.T) {

@@ -6,13 +6,19 @@ import (
 	"testing"
 )
 
-func TestSave(t *testing.T) {
+func TestCreate(t *testing.T) {
 	dir := t.TempDir()
 
-	err := Save(dir, "test.mp4", []byte("fake data"))
+	f, err := Create(dir, "test.mp4")
 	if err != nil {
-		t.Fatalf("error saving: %v", err)
+		t.Fatalf("error creating file: %v", err)
 	}
+
+	_, err = f.Write([]byte("fake data"))
+	if err != nil {
+		t.Fatalf("error writing: %v", err)
+	}
+	f.Close()
 
 	content, err := os.ReadFile(filepath.Join(dir, "test.mp4"))
 	if err != nil {
@@ -24,14 +30,15 @@ func TestSave(t *testing.T) {
 	}
 }
 
-func TestSave_CreatesDir(t *testing.T) {
+func TestCreate_CreatesDir(t *testing.T) {
 	base := t.TempDir()
 	dir := filepath.Join(base, "subdir", "nested")
 
-	err := Save(dir, "test.mp4", []byte("data"))
+	f, err := Create(dir, "test.mp4")
 	if err != nil {
-		t.Fatalf("error saving to nonexistent directory: %v", err)
+		t.Fatalf("error creating file in nonexistent directory: %v", err)
 	}
+	f.Close()
 
 	if _, err := os.Stat(filepath.Join(dir, "test.mp4")); os.IsNotExist(err) {
 		t.Error("file was not created")
