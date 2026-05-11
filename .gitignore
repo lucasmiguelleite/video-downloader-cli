@@ -36,3 +36,5 @@ go.work.sum
 
 tmp/
 cmd/cli/tmp/
+.DS_Store
+bin/
