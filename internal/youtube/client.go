@@ -42,22 +42,18 @@ func (c *Client) Download(video *downloader.Video, quality string) ([]byte, erro
 
 	format := &formats[0]
 
-	// 👇 aqui muda: agora pegamos o size também
 	stream, size, err := c.client.GetStream(v, format)
 	if err != nil {
 		return nil, err
 	}
 
-	// 👇 cria barra de progresso
 	bar := progressbar.DefaultBytes(
 		size,
 		"Downloading",
 	)
 
-	// 👇 junta stream + barra
 	reader := io.TeeReader(stream, bar)
 
-	// 👇 continua usando memória (por enquanto)
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
