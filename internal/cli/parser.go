@@ -13,6 +13,7 @@ type Input struct {
 	Quality     string
 	OutputDir   string
 	Concurrency int
+	Verbose     bool
 	ShowHelp    bool
 	ShowVersion bool
 }
@@ -24,6 +25,7 @@ func ParseArgs(args []string) (Input, error) {
 	quality := fs.String("resolution", "720p", "Video resolution (e.g. 360p, 480p, 720p, 1080p)")
 	outputDir := fs.String("output", "", "Directory to save the video (default: ~/Downloads)")
 	concurrency := fs.Int("concurrency", 20, "Number of parallel segment downloads (Kick only)")
+	verbose := fs.Bool("verbose", false, "Enable verbose (debug-level) logging")
 	showHelp := fs.Bool("help", false, "Show help")
 	showVersion := fs.Bool("version", false, "Show version")
 
@@ -45,6 +47,7 @@ func ParseArgs(args []string) (Input, error) {
 		Quality:     *quality,
 		OutputDir:   *outputDir,
 		Concurrency: *concurrency,
+		Verbose:     *verbose,
 		ShowHelp:    *showHelp,
 		ShowVersion: *showVersion,
 	}

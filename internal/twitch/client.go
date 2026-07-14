@@ -1,15 +1,12 @@
 package twitch
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"regexp"
-	"sync"
 
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/hls"
-
-	"github.com/schollz/progressbar/v3"
 )
 
 var vodIDRegex = regexp.MustCompile(`twitch\.tv/(?:[^/]+/v(?:ideo)?|videos)/(\d+)|twitch\.tv/.*[?&]video=v?(\d+)`)
@@ -30,13 +27,13 @@ func NewClientWithConcurrency(api TwitchAPI, concurrency int) *Client {
 	return &Client{api: api, concurrency: concurrency}
 }
 
-func (c *Client) GetVideo(url string) (*downloader.Video, error) {
+func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, error) {
 	vodID := extractVodID(url)
 	if vodID == "" {
 		return nil, fmt.Errorf("invalid Twitch VOD URL: %s", url)
 	}
 
-	info, err := c.api.FetchVideoInfo(vodID)
+	info, err := c.api.FetchVideoInfo(ctx, vodID)
 	if err != nil {
 		return nil, err
 	}
@@ -47,15 +44,15 @@ func (c *Client) GetVideo(url string) (*downloader.Video, error) {
 	}, nil
 }
 
-func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) error {
-	token, err := c.api.FetchAccessToken(video.URL)
+func (c *Client) Download(ctx context.Context, video *downloader.Video, quality, outputPath string) error {
+	token, err := c.api.FetchAccessToken(ctx, video.URL)
 	if err != nil {
 		return err
 	}
 
 	usherURL := BuildUsherURL(video.URL, token)
 
-	playlist, err := c.api.FetchPlaylist(usherURL)
+	playlist, err := c.api.FetchPlaylist(ctx, usherURL)
 	if err != nil {
 		return err
 	}
@@ -68,7 +65,7 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 			return fmt.Errorf("no matching variant found for quality %s", quality)
 		}
 
-		playlist, err = c.api.FetchPlaylist(segmentURL)
+		playlist, err = c.api.FetchPlaylist(ctx, segmentURL)
 		if err != nil {
 			return err
 		}
@@ -79,50 +76,10 @@ func (c *Client) Download(video *downloader.Video, quality string, w io.Writer) 
 		return fmt.Errorf("no segments found in playlist")
 	}
 
-	bar := progressbar.DefaultBytes(-1, "Downloading")
-
-	for batchStart := 0; batchStart < len(segments); batchStart += c.concurrency {
-		batchEnd := batchStart + c.concurrency
-		if batchEnd > len(segments) {
-			batchEnd = len(segments)
-		}
-		batch := segments[batchStart:batchEnd]
-
-		results := make([][]byte, len(batch))
-		var batchErr error
-		var mu sync.Mutex
-		var wg sync.WaitGroup
-
-		for i, segURL := range batch {
-			wg.Add(1)
-			go func(idx int, url string) {
-				defer wg.Done()
-				data, err := c.api.FetchSegment(url)
-				if err != nil {
-					mu.Lock()
-					if batchErr == nil {
-						batchErr = fmt.Errorf("failed to download segment: %w", err)
-					}
-					mu.Unlock()
-					return
-				}
-				results[idx] = data
-			}(i, segURL)
-		}
-
-		wg.Wait()
-
-		if batchErr != nil {
-			return batchErr
-		}
-
-		for _, data := range results {
-			w.Write(data)
-			bar.Add(len(data))
-		}
-	}
-
-	return nil
+	return hls.FetchSegments(ctx, segments, hls.FetchOptions{
+		Concurrency: c.concurrency,
+		Fetch:       c.api.FetchSegment,
+	}, outputPath)
 }
 
 func extractVodID(url string) string {

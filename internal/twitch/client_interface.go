@@ -1,5 +1,7 @@
 package twitch
 
+import "context"
+
 type VideoInfo struct {
 	Title string
 }
@@ -10,8 +12,8 @@ type AccessToken struct {
 }
 
 type TwitchAPI interface {
-	FetchVideoInfo(videoID string) (*VideoInfo, error)
-	FetchAccessToken(videoID string) (*AccessToken, error)
-	FetchPlaylist(m3u8URL string) (string, error)
-	FetchSegment(url string) ([]byte, error)
+	FetchVideoInfo(ctx context.Context, videoID string) (*VideoInfo, error)
+	FetchAccessToken(ctx context.Context, videoID string) (*AccessToken, error)
+	FetchPlaylist(ctx context.Context, m3u8URL string) (string, error)
+	FetchSegment(ctx context.Context, url string) ([]byte, error)
 }

@@ -1,6 +1,7 @@
 package youtube
 
 import (
+	"context"
 	"io"
 
 	"github.com/kkdai/youtube/v2"
@@ -14,10 +15,10 @@ func NewRealAPI() *RealAPI {
 	return &RealAPI{}
 }
 
-func (r *RealAPI) GetVideo(url string) (*youtube.Video, error) {
-	return r.client.GetVideo(url)
+func (r *RealAPI) GetVideo(ctx context.Context, url string) (*youtube.Video, error) {
+	return r.client.GetVideoContext(ctx, url)
 }
 
-func (r *RealAPI) GetStream(v *youtube.Video, f *youtube.Format) (io.ReadCloser, int64, error) {
-	return r.client.GetStream(v, f)
+func (r *RealAPI) GetStream(ctx context.Context, v *youtube.Video, f *youtube.Format) (io.ReadCloser, int64, error) {
+	return r.client.GetStreamContext(ctx, v, f)
 }

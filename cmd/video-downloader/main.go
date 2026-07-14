@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"youtube-downloader/internal/app"
 	"youtube-downloader/internal/cli"
@@ -33,6 +37,7 @@ func main() {
 		fmt.Println("  --resolution <res>  Video resolution (default: 720p)")
 		fmt.Println("  --output <dir>      Directory to save the video (default: ~/Downloads)")
 		fmt.Println("  --concurrency <N>   Parallel segment downloads for HLS streams (default: 20)")
+		fmt.Println("  --verbose           Enable debug-level logging")
 		fmt.Println("  --help              Show this help")
 		fmt.Println("  --version           Show version")
 		fmt.Println()
@@ -69,6 +74,9 @@ func main() {
 
 	service, needsRemux := resolveService(input.URL, input.Concurrency)
 
+	logger := cli.NewLogger(os.Stderr, input.Verbose)
+	slog.SetDefault(logger)
+
 	var usecase *app.DownloadUseCase
 	if needsRemux && input.OutputDir != "" {
 		usecase = app.NewDownloadUseCaseWithRemux(service, input.OutputDir)
@@ -79,8 +87,14 @@ func main() {
 	} else {
 		usecase = app.NewDownloadUseCase(service)
 	}
+	usecase.WithLogger(logger)
 
-	path, err := usecase.Execute(input.URL, input.Quality)
+	// Catch Ctrl+C / SIGTERM so in-flight HTTP requests cancel cleanly and
+	// the partial file is kept for resume.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	path, err := usecase.Execute(ctx, input.URL, input.Quality)
 	if err != nil {
 		fmt.Println("Error downloading video:", err)
 		os.Exit(1)

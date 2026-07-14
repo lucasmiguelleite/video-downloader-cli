@@ -39,3 +39,4 @@ cmd/cli/tmp/
 .DS_Store
 bin/
 actions-runner/
+.zcode/

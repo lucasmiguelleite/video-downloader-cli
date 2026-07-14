@@ -1,6 +1,6 @@
 package downloader
 
-import "io"
+import "context"
 
 type Video struct {
 	Title string
@@ -8,6 +8,9 @@ type Video struct {
 }
 
 type Service interface {
-	GetVideo(url string) (*Video, error)
-	Download(video *Video, quality string, w io.Writer) error
+	GetVideo(ctx context.Context, url string) (*Video, error)
+	// Download fetches the video and writes it to outputPath. outputPath is a
+	// filesystem path (not an io.Writer) so the implementation can keep a
+	// resume sidecar next to the output file.
+	Download(ctx context.Context, video *Video, quality, outputPath string) error
 }

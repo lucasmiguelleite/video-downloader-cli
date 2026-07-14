@@ -62,10 +62,34 @@ video-downloader --version
 | `--resolution` | Video resolution | `720p` |
 | `--output` | Directory to save the video | `~/Downloads` |
 | `--concurrency` | Parallel segment downloads (Twitch/Kick) | `20` |
+| `--verbose` | Enable debug-level logging | `false` |
 | `--help` | Show help | — |
 | `--version` | Show version | — |
 
 > If the URL contains `&`, wrap it in single quotes to avoid shell issues.
+
+### Resuming downloads
+
+If a Twitch or Kick download is interrupted (Ctrl+C, network drop, terminal
+close), re-running the same command resumes from where it stopped. Progress is
+tracked in a `<file>.mp4.part` sidecar next to the output.
+
+```bash
+# interrupted halfway — partial file + .part sidecar are kept
+video-downloader --url 'https://twitch.tv/videos/1234567890'
+
+# re-run the same command to resume
+video-downloader --url 'https://twitch.tv/videos/1234567890'
+```
+
+To start over from scratch, delete the `.part` file:
+
+```bash
+rm ~/Downloads/*.mp4.part
+```
+
+> YouTube downloads are single-stream and are not resumable; they restart from
+> the beginning on each run.
 
 ## Development
 

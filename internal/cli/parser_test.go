@@ -141,3 +141,31 @@ func TestParseArgs_InvalidFlag(t *testing.T) {
 		t.Error("expected error for invalid flag")
 	}
 }
+
+func TestParseArgs_Verbose(t *testing.T) {
+	args := []string{"--url", "http://video", "--verbose"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if !input.Verbose {
+		t.Error("expected Verbose to be true when --verbose is passed")
+	}
+}
+
+func TestParseArgs_DefaultVerbose(t *testing.T) {
+	args := []string{"--url", "http://video"}
+
+	input, err := ParseArgs(args)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if input.Verbose {
+		t.Error("default Verbose should be false")
+	}
+}

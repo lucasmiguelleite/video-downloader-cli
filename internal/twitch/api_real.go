@@ -2,11 +2,13 @@ package twitch
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 const clientID = "ue6666qo983tsx6so1t0vnawi233wa"
@@ -16,17 +18,17 @@ type RealAPI struct {
 }
 
 func NewRealAPI() *RealAPI {
-	return &RealAPI{client: &http.Client{}}
+	return &RealAPI{client: &http.Client{Timeout: 30 * time.Second}}
 }
 
-func (api *RealAPI) FetchVideoInfo(videoID string) (*VideoInfo, error) {
+func (api *RealAPI) FetchVideoInfo(ctx context.Context, videoID string) (*VideoInfo, error) {
 	query := fmt.Sprintf(`{
 		video(id: "%s") {
 			title
 		}
 	}`, videoID)
 
-	data, err := api.graphql(query)
+	data, err := api.graphql(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +53,7 @@ func (api *RealAPI) FetchVideoInfo(videoID string) (*VideoInfo, error) {
 	return &VideoInfo{Title: title}, nil
 }
 
-func (api *RealAPI) FetchAccessToken(videoID string) (*AccessToken, error) {
+func (api *RealAPI) FetchAccessToken(ctx context.Context, videoID string) (*AccessToken, error) {
 	query := fmt.Sprintf(`{
 		videoPlaybackAccessToken(id: "%s", params: {platform: "web", playerBackend: "mediaplayer", playerType: "site"}) {
 			value
@@ -59,7 +61,7 @@ func (api *RealAPI) FetchAccessToken(videoID string) (*AccessToken, error) {
 		}
 	}`, videoID)
 
-	data, err := api.graphql(query)
+	data, err := api.graphql(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +85,20 @@ func (api *RealAPI) FetchAccessToken(videoID string) (*AccessToken, error) {
 	}, nil
 }
 
-func (api *RealAPI) FetchPlaylist(m3u8URL string) (string, error) {
-	resp, err := api.client.Get(m3u8URL)
+func (api *RealAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m3u8URL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := api.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("twitch playlist fetch returned HTTP %d for %s", resp.StatusCode, m3u8URL)
+	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -98,20 +108,28 @@ func (api *RealAPI) FetchPlaylist(m3u8URL string) (string, error) {
 	return string(data), nil
 }
 
-func (api *RealAPI) FetchSegment(url string) ([]byte, error) {
-	resp, err := api.client.Get(url)
+func (api *RealAPI) FetchSegment(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("twitch segment fetch returned HTTP %d for %s", resp.StatusCode, url)
+	}
+
 	return io.ReadAll(resp.Body)
 }
 
-func (api *RealAPI) graphql(query string) ([]byte, error) {
+func (api *RealAPI) graphql(ctx context.Context, query string) ([]byte, error) {
 	body, _ := json.Marshal(map[string]string{"query": query})
 
-	req, err := http.NewRequest("POST", "https://gql.twitch.tv/gql", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://gql.twitch.tv/gql", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
