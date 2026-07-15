@@ -117,10 +117,10 @@ go build -o bin/video-downloader ./cmd/video-downloader/
 cmd/video-downloader/    # Entry point (main)
 internal/
   app/                   # Use cases (business logic)
-  cli/                   # Argument parser and terminal utilities
-  downloader/            # Download service interface
+  cli/                   # Argument parser, terminal utilities, logging
+  downloader/            # Download service interface + retry-with-backoff
   fs/                    # File system operations
-  hls/                   # Shared HLS/m3u8 parser
+  hls/                   # m3u8 parser, shared segment fetcher, resume manifest
   kick/                  # Kick VOD client
   twitch/                # Twitch VOD client (GraphQL + HLS)
   youtube/               # YouTube API client
