@@ -2,7 +2,10 @@ package youtube
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"youtube-downloader/internal/downloader"
@@ -12,7 +15,7 @@ import (
 
 type mockAPI struct{}
 
-func (m *mockAPI) GetVideo(url string) (*youtube.Video, error) {
+func (m *mockAPI) GetVideo(ctx context.Context, url string) (*youtube.Video, error) {
 	return &youtube.Video{
 		Title: "test-video",
 		Formats: youtube.FormatList{
@@ -25,7 +28,7 @@ func (m *mockAPI) GetVideo(url string) (*youtube.Video, error) {
 	}, nil
 }
 
-func (m *mockAPI) GetStream(v *youtube.Video, f *youtube.Format) (io.ReadCloser, int64, error) {
+func (m *mockAPI) GetStream(ctx context.Context, v *youtube.Video, f *youtube.Format) (io.ReadCloser, int64, error) {
 	data := []byte("fake video data")
 	return io.NopCloser(bytes.NewReader(data)), int64(len(data)), nil
 }
@@ -33,7 +36,7 @@ func (m *mockAPI) GetStream(v *youtube.Video, f *youtube.Format) (io.ReadCloser,
 func TestGetVideo(t *testing.T) {
 	client := NewClient(&mockAPI{})
 
-	video, err := client.GetVideo("http://test")
+	video, err := client.GetVideo(context.Background(), "http://test")
 
 	if err != nil {
 		t.Fatalf("expected no error")
@@ -51,14 +54,18 @@ func TestDownload(t *testing.T) {
 		URL: "http://test",
 	}
 
-	var buf bytes.Buffer
-	err := client.Download(video, "720p", &buf)
+	path := filepath.Join(t.TempDir(), "out.mp4")
+	err := client.Download(context.Background(), video, "720p", path)
 
 	if err != nil {
 		t.Fatalf("expected no error: %v", err)
 	}
 
-	if buf.String() != "fake video data" {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("file not written: %v", err)
+	}
+	if string(content) != "fake video data" {
 		t.Errorf("invalid content")
 	}
 }

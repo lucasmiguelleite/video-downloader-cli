@@ -1,7 +1,9 @@
 package twitch
 
 import (
-	"bytes"
+	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"youtube-downloader/internal/downloader"
@@ -15,18 +17,18 @@ type mockAPI struct {
 	videoErr    error
 }
 
-func (m *mockAPI) FetchVideoInfo(videoID string) (*VideoInfo, error) {
+func (m *mockAPI) FetchVideoInfo(ctx context.Context, videoID string) (*VideoInfo, error) {
 	if m.videoErr != nil {
 		return nil, m.videoErr
 	}
 	return m.videoInfo, nil
 }
 
-func (m *mockAPI) FetchAccessToken(videoID string) (*AccessToken, error) {
+func (m *mockAPI) FetchAccessToken(ctx context.Context, videoID string) (*AccessToken, error) {
 	return m.accessToken, nil
 }
 
-func (m *mockAPI) FetchPlaylist(m3u8URL string) (string, error) {
+func (m *mockAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, error) {
 	if m.playlists != nil {
 		if p, ok := m.playlists[m3u8URL]; ok {
 			return p, nil
@@ -35,7 +37,7 @@ func (m *mockAPI) FetchPlaylist(m3u8URL string) (string, error) {
 	return "", nil
 }
 
-func (m *mockAPI) FetchSegment(url string) ([]byte, error) {
+func (m *mockAPI) FetchSegment(ctx context.Context, url string) ([]byte, error) {
 	if data, ok := m.segments[url]; ok {
 		return data, nil
 	}
@@ -48,7 +50,7 @@ func TestGetVideo(t *testing.T) {
 	}
 
 	client := NewClient(api)
-	video, err := client.GetVideo("https://www.twitch.tv/videos/1234567890")
+	video, err := client.GetVideo(context.Background(), "https://www.twitch.tv/videos/1234567890")
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -65,7 +67,7 @@ func TestGetVideo_PlayerURL(t *testing.T) {
 	}
 
 	client := NewClient(api)
-	video, err := client.GetVideo("https://player.twitch.tv/?video=1234567890")
+	video, err := client.GetVideo(context.Background(), "https://player.twitch.tv/?video=1234567890")
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -80,7 +82,7 @@ func TestGetVideo_InvalidURL(t *testing.T) {
 	api := &mockAPI{}
 	client := NewClient(api)
 
-	_, err := client.GetVideo("https://youtube.com/watch?v=xxx")
+	_, err := client.GetVideo(context.Background(), "https://youtube.com/watch?v=xxx")
 
 	if err == nil {
 		t.Error("expected error for non-Twitch URL")
@@ -107,7 +109,7 @@ https://cdn.example.com/720p/seg2.ts
 	api := &mockAPI{
 		accessToken: token,
 		playlists: map[string]string{
-			usherURL:                               master,
+			usherURL: master,
 			"https://cdn.example.com/720p/index.m3u8": media,
 		},
 		segments: map[string][]byte{
@@ -117,19 +119,20 @@ https://cdn.example.com/720p/seg2.ts
 	}
 
 	client := NewClient(api)
-	var buf bytes.Buffer
-	err := client.Download(&downloader.Video{
+	path := filepath.Join(t.TempDir(), "out.ts")
+	err := client.Download(context.Background(), &downloader.Video{
 		Title: "Test",
 		URL:   "1234567890",
-	}, "720p", &buf)
+	}, "720p", path)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
+	got, _ := os.ReadFile(path)
 	expected := "data1data2"
-	if buf.String() != expected {
-		t.Errorf("expected '%s', got '%s'", expected, buf.String())
+	if string(got) != expected {
+		t.Errorf("expected '%s', got '%s'", expected, string(got))
 	}
 }
 

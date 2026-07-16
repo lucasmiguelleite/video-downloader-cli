@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,7 +69,7 @@ func TestRemuxToMP4_NoFFmpeg(t *testing.T) {
 	os.Setenv("PATH", "")
 	defer os.Setenv("PATH", originalPath)
 
-	err := RemuxToMP4(fakePath)
+	err := RemuxToMP4(context.Background(), fakePath)
 	if err == nil {
 		t.Error("expected error when ffmpeg is not available")
 	}

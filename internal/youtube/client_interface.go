@@ -1,12 +1,13 @@
 package youtube
 
 import (
+	"context"
 	"io"
 
 	"github.com/kkdai/youtube/v2"
 )
 
 type YouTubeAPI interface {
-	GetVideo(url string) (*youtube.Video, error)
-	GetStream(video *youtube.Video, format *youtube.Format) (io.ReadCloser, int64, error)
+	GetVideo(ctx context.Context, url string) (*youtube.Video, error)
+	GetStream(ctx context.Context, video *youtube.Video, format *youtube.Format) (io.ReadCloser, int64, error)
 }
