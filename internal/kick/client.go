@@ -3,13 +3,12 @@ package kick
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"net/url"
+	"strings"
 
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/hls"
 )
-
-var videoIDRegex = regexp.MustCompile(`kick\.com/\w+/videos/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`)
 
 // Client downloads Kick VODs through a KickAPI.
 type Client struct {
@@ -32,12 +31,10 @@ func NewClientWithConcurrency(api KickAPI, concurrency int) *Client {
 
 // GetVideo resolves Kick VOD metadata from url.
 func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, error) {
-	matches := videoIDRegex.FindStringSubmatch(url)
-	if len(matches) < 2 {
-		return nil, fmt.Errorf("invalid Kick VOD URL: %s", url)
+	videoID, err := extractVideoID(url)
+	if err != nil {
+		return nil, err
 	}
-
-	videoID := matches[1]
 
 	info, err := c.api.FetchVideoInfo(ctx, videoID)
 	if err != nil {
@@ -48,6 +45,37 @@ func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, e
 		Title: info.Title,
 		URL:   info.SourceURL,
 	}, nil
+}
+
+func extractVideoID(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.RawPath != "" {
+		return "", fmt.Errorf("invalid Kick VOD URL %q; expected an unescaped HTTPS URL", rawURL)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host != "kick.com" && host != "www.kick.com" {
+		return "", fmt.Errorf("invalid Kick host %q in %s", host, rawURL)
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] == "" || parts[1] != "videos" || !validUUID(parts[2]) {
+		return "", fmt.Errorf("invalid Kick VOD path %q; expected /channel/videos/UUID", parsed.Path)
+	}
+	return strings.ToLower(parts[2]), nil
+}
+
+func validUUID(value string) bool {
+	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' {
+		return false
+	}
+	for i, r := range value {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			continue
+		}
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 // Download fetches and writes a Kick VOD to outputPath.

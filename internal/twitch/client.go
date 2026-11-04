@@ -3,13 +3,12 @@ package twitch
 import (
 	"context"
 	"fmt"
-	"regexp"
+	"net/url"
+	"strings"
 
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/hls"
 )
-
-var vodIDRegex = regexp.MustCompile(`twitch\.tv/(?:[^/]+/v(?:ideo)?|videos)/(\d+)|twitch\.tv/.*[?&]video=v?(\d+)`)
 
 // Client downloads Twitch VODs through a TwitchAPI.
 type Client struct {
@@ -32,9 +31,9 @@ func NewClientWithConcurrency(api TwitchAPI, concurrency int) *Client {
 
 // GetVideo resolves Twitch VOD metadata from url.
 func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, error) {
-	vodID := extractVodID(url)
-	if vodID == "" {
-		return nil, fmt.Errorf("invalid Twitch VOD URL: %s", url)
+	vodID, err := extractVodID(url)
+	if err != nil {
+		return nil, err
 	}
 
 	info, err := c.api.FetchVideoInfo(ctx, vodID)
@@ -66,12 +65,47 @@ func (c *Client) Download(ctx context.Context, video *downloader.Video, quality,
 	return nil
 }
 
-func extractVodID(url string) string {
-	matches := vodIDRegex.FindStringSubmatch(url)
-	for i := 1; i < len(matches); i++ {
-		if matches[i] != "" {
-			return matches[i]
+func extractVodID(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.RawPath != "" {
+		return "", fmt.Errorf("invalid Twitch VOD URL %q; expected an unescaped HTTPS URL", rawURL)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "player.twitch.tv" {
+		return twitchPlayerID(parsed, rawURL)
+	}
+	if host != "twitch.tv" && host != "www.twitch.tv" {
+		return "", fmt.Errorf("invalid Twitch host %q in %s", host, rawURL)
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	var id string
+	if len(parts) == 2 && parts[0] == "videos" {
+		id = parts[1]
+	} else if len(parts) == 3 && (parts[1] == "v" || parts[1] == "video") {
+		id = parts[2]
+	}
+	if !digitsOnly(id) {
+		return "", fmt.Errorf("invalid Twitch VOD identifier in %s", rawURL)
+	}
+	return id, nil
+}
+
+func twitchPlayerID(parsed *url.URL, rawURL string) (string, error) {
+	id := strings.TrimPrefix(parsed.Query().Get("video"), "v")
+	if !digitsOnly(id) {
+		return "", fmt.Errorf("invalid Twitch player video identifier in %s", rawURL)
+	}
+	return id, nil
+}
+
+func digitsOnly(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
 		}
 	}
-	return ""
+	return true
 }

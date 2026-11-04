@@ -74,6 +74,37 @@ func TestGetVideo_InvalidURL(t *testing.T) {
 	}
 }
 
+func TestGetVideo_RejectsLookalikeHost(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "https://notkick.com/a/videos/7b0877f1-983d-4c5f-932e-cda88e8196f1")
+	if err == nil {
+		t.Fatal("expected lookalike host error")
+	}
+}
+
+func TestGetVideo_RejectsHTTPURL(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "http://kick.com/a/videos/7b0877f1-983d-4c5f-932e-cda88e8196f1")
+	if err == nil {
+		t.Fatal("expected HTTP scheme error")
+	}
+}
+
+func TestGetVideo_RejectsEncodedPath(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "https://kick.com/a/videos/%37b0877f1-983d-4c5f-932e-cda88e8196f1")
+	if err == nil {
+		t.Fatal("expected encoded path error")
+	}
+}
+
+func TestGetVideo_NormalizesUppercaseUUID(t *testing.T) {
+	id, err := extractVideoID("https://kick.com/a/videos/7B0877F1-983D-4C5F-932E-CDA88E8196F1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id != "7b0877f1-983d-4c5f-932e-cda88e8196f1" {
+		t.Errorf("video ID = %q", id)
+	}
+}
+
 func TestDownload_MediaPlaylist(t *testing.T) {
 	playlist := `#EXTM3U
 #EXTINF:10.0,

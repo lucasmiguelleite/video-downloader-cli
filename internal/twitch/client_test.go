@@ -89,6 +89,38 @@ func TestGetVideo_InvalidURL(t *testing.T) {
 	}
 }
 
+func TestGetVideo_RejectsLookalikeHost(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "https://eviltwitch.tv/videos/123")
+	if err == nil {
+		t.Fatal("expected lookalike host error")
+	}
+}
+
+func TestGetVideo_RejectsHTTPURL(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "http://twitch.tv/videos/123")
+	if err == nil {
+		t.Fatal("expected HTTP scheme error")
+	}
+}
+
+func TestGetVideo_RejectsEncodedPath(t *testing.T) {
+	_, err := NewClient(&mockAPI{}).GetVideo(context.Background(), "https://twitch.tv/videos/%31%32%33")
+	if err == nil {
+		t.Fatal("expected encoded path error")
+	}
+}
+
+func TestGetVideo_ChannelVideoURL(t *testing.T) {
+	api := &mockAPI{videoInfo: &VideoInfo{Title: "Test"}}
+	video, err := NewClient(api).GetVideo(context.Background(), "https://twitch.tv/channel/video/123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if video.URL != "123" {
+		t.Errorf("video ID = %q", video.URL)
+	}
+}
+
 func TestDownload(t *testing.T) {
 	token := &AccessToken{Value: "fake-token", Signature: "fake-sig"}
 	usherURL := BuildUsherURL("1234567890", token)
