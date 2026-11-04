@@ -52,40 +52,10 @@ func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, e
 
 // Download fetches and writes a Kick VOD to outputPath.
 func (c *Client) Download(ctx context.Context, video *downloader.Video, quality, outputPath string) error {
-	playlist, err := c.api.FetchPlaylist(ctx, video.URL)
-	if err != nil {
-		return fmt.Errorf("fetch Kick playlist %s: %w", video.URL, err)
-	}
-
-	segmentURL := video.URL
-
-	if hls.IsMasterPlaylist(playlist) {
-		segmentURL, err = hls.SelectVariant(video.URL, playlist, quality)
-		if err != nil {
-			return fmt.Errorf("select Kick stream variant: %w", err)
-		}
-		if segmentURL == "" {
-			return fmt.Errorf("no matching variant found for quality %s", quality)
-		}
-
-		playlist, err = c.api.FetchPlaylist(ctx, segmentURL)
-		if err != nil {
-			return fmt.Errorf("fetch Kick media playlist %s: %w", segmentURL, err)
-		}
-	}
-
-	segments, err := hls.ParseSegments(segmentURL, playlist)
-	if err != nil {
-		return fmt.Errorf("parse Kick media playlist: %w", err)
-	}
-	if len(segments) == 0 {
-		return fmt.Errorf("no segments found in playlist")
-	}
-
-	if err := hls.FetchSegments(ctx, segments, hls.FetchOptions{
+	if err := hls.Download(ctx, video.URL, quality, outputPath, c.api.FetchPlaylist, hls.FetchOptions{
 		Concurrency: c.concurrency,
 		Fetch:       c.api.FetchSegment,
-	}, outputPath); err != nil {
+	}); err != nil {
 		return fmt.Errorf("download Kick segments: %w", err)
 	}
 	return nil

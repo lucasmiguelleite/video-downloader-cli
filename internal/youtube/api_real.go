@@ -3,6 +3,7 @@ package youtube
 import (
 	"context"
 	"io"
+	"net/http"
 
 	"github.com/kkdai/youtube/v2"
 )
@@ -15,6 +16,14 @@ type RealAPI struct {
 // NewRealAPI creates the production YouTube API adapter.
 func NewRealAPI() *RealAPI {
 	return &RealAPI{}
+}
+
+// NewRealAPIWithHTTPClient creates a YouTube API adapter using client.
+func NewRealAPIWithHTTPClient(client *http.Client) *RealAPI {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return &RealAPI{client: youtube.Client{HTTPClient: client}}
 }
 
 func (r *RealAPI) GetVideo(ctx context.Context, url string) (*youtube.Video, error) {

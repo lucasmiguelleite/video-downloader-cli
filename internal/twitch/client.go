@@ -57,40 +57,10 @@ func (c *Client) Download(ctx context.Context, video *downloader.Video, quality,
 
 	usherURL := BuildUsherURL(video.URL, token)
 
-	playlist, err := c.api.FetchPlaylist(ctx, usherURL)
-	if err != nil {
-		return fmt.Errorf("fetch Twitch master playlist %s: %w", usherURL, err)
-	}
-
-	segmentURL := usherURL
-
-	if hls.IsMasterPlaylist(playlist) {
-		segmentURL, err = hls.SelectVariant(usherURL, playlist, quality)
-		if err != nil {
-			return fmt.Errorf("select Twitch stream variant: %w", err)
-		}
-		if segmentURL == "" {
-			return fmt.Errorf("no matching variant found for quality %s", quality)
-		}
-
-		playlist, err = c.api.FetchPlaylist(ctx, segmentURL)
-		if err != nil {
-			return fmt.Errorf("fetch Twitch media playlist %s: %w", segmentURL, err)
-		}
-	}
-
-	segments, err := hls.ParseSegments(segmentURL, playlist)
-	if err != nil {
-		return fmt.Errorf("parse Twitch media playlist: %w", err)
-	}
-	if len(segments) == 0 {
-		return fmt.Errorf("no segments found in playlist")
-	}
-
-	if err := hls.FetchSegments(ctx, segments, hls.FetchOptions{
+	if err := hls.Download(ctx, usherURL, quality, outputPath, c.api.FetchPlaylist, hls.FetchOptions{
 		Concurrency: c.concurrency,
 		Fetch:       c.api.FetchSegment,
-	}, outputPath); err != nil {
+	}); err != nil {
 		return fmt.Errorf("download Twitch segments: %w", err)
 	}
 	return nil

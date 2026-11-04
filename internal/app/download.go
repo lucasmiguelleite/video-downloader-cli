@@ -18,19 +18,35 @@ type DownloadUseCase struct {
 	log        *slog.Logger
 }
 
+// DownloadOptions configures a DownloadUseCase.
+type DownloadOptions struct {
+	Dir        string
+	NeedsRemux bool
+	Logger     *slog.Logger
+}
+
+// NewDownloadUseCaseWithOptions creates a configured download use case.
+func NewDownloadUseCaseWithOptions(s downloader.Service, opts DownloadOptions) *DownloadUseCase {
+	log := opts.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	return &DownloadUseCase{service: s, dir: opts.Dir, needsRemux: opts.NeedsRemux, log: log}
+}
+
 // NewDownloadUseCase creates a download use case using the default directory.
 func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
-	return &DownloadUseCase{service: s, log: slog.Default()}
+	return NewDownloadUseCaseWithOptions(s, DownloadOptions{})
 }
 
 // NewDownloadUseCaseWithDir creates a download use case writing to dir.
 func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCase {
-	return &DownloadUseCase{service: s, dir: dir, log: slog.Default()}
+	return NewDownloadUseCaseWithOptions(s, DownloadOptions{Dir: dir})
 }
 
 // NewDownloadUseCaseWithRemux creates a use case that remuxes HLS output.
 func NewDownloadUseCaseWithRemux(s downloader.Service, dir string) *DownloadUseCase {
-	return &DownloadUseCase{service: s, dir: dir, needsRemux: true, log: slog.Default()}
+	return NewDownloadUseCaseWithOptions(s, DownloadOptions{Dir: dir, NeedsRemux: true})
 }
 
 // WithLogger attaches a structured logger. Returns the use case for chaining.

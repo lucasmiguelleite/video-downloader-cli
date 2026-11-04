@@ -20,7 +20,15 @@ type RealAPI struct {
 
 // NewRealAPI creates a production Twitch HTTP client.
 func NewRealAPI() *RealAPI {
-	return &RealAPI{client: &http.Client{Timeout: 30 * time.Second}}
+	return NewRealAPIWithHTTPClient(&http.Client{Timeout: 30 * time.Second})
+}
+
+// NewRealAPIWithHTTPClient creates a Twitch API adapter using client.
+func NewRealAPIWithHTTPClient(client *http.Client) *RealAPI {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	return &RealAPI{client: client}
 }
 
 func (api *RealAPI) FetchVideoInfo(ctx context.Context, videoID string) (*VideoInfo, error) {

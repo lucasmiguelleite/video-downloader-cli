@@ -81,17 +81,11 @@ func main() {
 	logger := cli.NewLogger(os.Stderr, input.Verbose)
 	slog.SetDefault(logger)
 
-	var usecase *app.DownloadUseCase
-	if needsRemux && input.OutputDir != "" {
-		usecase = app.NewDownloadUseCaseWithRemux(service, input.OutputDir)
-	} else if needsRemux {
-		usecase = app.NewDownloadUseCaseWithRemux(service, "")
-	} else if input.OutputDir != "" {
-		usecase = app.NewDownloadUseCaseWithDir(service, input.OutputDir)
-	} else {
-		usecase = app.NewDownloadUseCase(service)
-	}
-	usecase.WithLogger(logger)
+	usecase := app.NewDownloadUseCaseWithOptions(service, app.DownloadOptions{
+		Dir:        input.OutputDir,
+		NeedsRemux: needsRemux,
+		Logger:     logger,
+	})
 
 	// Catch Ctrl+C / SIGTERM so in-flight HTTP requests cancel cleanly and
 	// the partial file is kept for resume.
