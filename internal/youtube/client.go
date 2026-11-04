@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"youtube-downloader/internal/downloader"
@@ -36,9 +37,7 @@ func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, e
 	}, nil
 }
 
-// Download fetches the video and writes it to outputPath. YouTube streams are
-// single-file (not segmented), so resumability is not supported here — the
-// output is truncated at the start of every run.
+// Download fetches the video and atomically replaces outputPath on success.
 func (c *Client) Download(ctx context.Context, video *downloader.Video, quality, outputPath string) error {
 	v, err := c.client.GetVideo(ctx, video.URL)
 	if err != nil {
@@ -61,19 +60,34 @@ func (c *Client) Download(ctx context.Context, video *downloader.Video, quality,
 	}
 	defer stream.Close()
 
-	f, err := os.Create(outputPath)
+	bar := progressbar.DefaultBytes(size, "Downloading")
+	return writeStreamAtomically(outputPath, io.TeeReader(stream, bar))
+}
+
+func writeStreamAtomically(outputPath string, stream io.Reader) error {
+	temp, err := os.CreateTemp(filepath.Dir(outputPath), ".youtube-*")
 	if err != nil {
-		return fmt.Errorf("create output file %q: %w", outputPath, err)
+		return fmt.Errorf("create temporary output for %q: %w", outputPath, err)
 	}
-	defer f.Close()
-
-	bar := progressbar.DefaultBytes(
-		size,
-		"Downloading",
-	)
-
-	if _, err := io.Copy(f, io.TeeReader(stream, bar)); err != nil {
+	tempPath := temp.Name()
+	defer os.Remove(tempPath)
+	if _, err := io.Copy(temp, stream); err != nil {
+		_ = temp.Close()
 		return fmt.Errorf("write YouTube stream to %q: %w", outputPath, err)
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("sync YouTube output %q: %w", outputPath, err)
+	}
+	if err := temp.Chmod(0o644); err != nil {
+		_ = temp.Close()
+		return fmt.Errorf("set YouTube output permissions %q: %w", outputPath, err)
+	}
+	if err := temp.Close(); err != nil {
+		return fmt.Errorf("close YouTube output %q: %w", outputPath, err)
+	}
+	if err := os.Rename(tempPath, outputPath); err != nil {
+		return fmt.Errorf("replace YouTube output %q: %w", outputPath, err)
 	}
 	return nil
 }

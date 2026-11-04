@@ -70,6 +70,28 @@ func TestDownload(t *testing.T) {
 	}
 }
 
+func TestWriteStreamAtomically_PreservesExistingFileOnFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.mp4")
+	if err := os.WriteFile(path, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stream := io.MultiReader(bytes.NewReader([]byte("partial")), failingReader{})
+	if err := writeStreamAtomically(path, stream); err == nil {
+		t.Fatal("expected write error")
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "existing" {
+		t.Errorf("existing output was replaced with %q", got)
+	}
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
 func TestSelectFormat_PrefersRequestedQuality(t *testing.T) {
 	formats := youtube.FormatList{{QualityLabel: "1080p"}, {QualityLabel: "720p"}, {QualityLabel: "480p"}}
 	format, err := selectFormat(formats, "720p")

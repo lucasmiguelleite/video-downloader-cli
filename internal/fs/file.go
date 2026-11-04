@@ -2,6 +2,7 @@ package fs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,8 +36,33 @@ func SafeFilename(title, extension string) string {
 	return title + extension
 }
 
-// MkdirAll creates dir (and any missing parents) with mode 0755. It is a
-// no-op (returns nil) when dir already exists.
+// AvailablePath returns path when unused, or when preserveResume is true and
+// an HLS resume sidecar exists. Otherwise it returns a numbered sibling.
+func AvailablePath(path string, preserveResume bool) (string, error) {
+	if preserveResume {
+		if _, err := os.Stat(path + ".part"); err == nil {
+			return path, nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("stat resume sidecar %q: %w", path+".part", err)
+		}
+	}
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return path, nil
+	} else if err != nil {
+		return "", fmt.Errorf("stat output path %q: %w", path, err)
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	for i := 1; ; i++ {
+		candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
+		if _, err := os.Stat(candidate); errors.Is(err, os.ErrNotExist) {
+			return candidate, nil
+		} else if err != nil {
+			return "", fmt.Errorf("stat output candidate %q: %w", candidate, err)
+		}
+	}
+}
+
 // MkdirAll creates dir and any missing parent directories.
 func MkdirAll(dir string) error {
 	return os.MkdirAll(dir, 0755)

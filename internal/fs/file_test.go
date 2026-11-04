@@ -67,6 +67,57 @@ func TestSafeFilename_RemovesPathSeparators(t *testing.T) {
 	}
 }
 
+func TestAvailablePath_AppendsCounter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "video.mp4")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := AvailablePath(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(dir, "video (1).mp4") {
+		t.Errorf("AvailablePath() = %q", got)
+	}
+}
+
+func TestAvailablePath_PreservesResumePath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "video.mp4")
+	if err := os.WriteFile(path, []byte("partial"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".part", []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := AvailablePath(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != path {
+		t.Errorf("AvailablePath() = %q, want resume path %q", got, path)
+	}
+}
+
+func TestAvailablePath_IgnoresResumeSidecarWhenResumeDisabled(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "video.mp4")
+	if err := os.WriteFile(path, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".part", []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := AvailablePath(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != filepath.Join(dir, "video (1).mp4") {
+		t.Errorf("AvailablePath() = %q", got)
+	}
+}
+
 func TestRemuxToMP4_NoFFmpeg(t *testing.T) {
 	dir := t.TempDir()
 	fakePath := filepath.Join(dir, "video.mp4")

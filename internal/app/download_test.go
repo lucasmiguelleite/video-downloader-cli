@@ -34,7 +34,7 @@ func TestDownloaderUseCase(t *testing.T) {
 	dir := t.TempDir()
 
 	service := &mockService{}
-	uc := NewDownloadUseCaseWithDir(service, dir)
+	uc := NewDownloadUseCaseWithOptions(service, DownloadOptions{Dir: dir})
 
 	path, err := uc.Execute(context.Background(), "url", "720p")
 
@@ -74,7 +74,10 @@ func TestDownloaderUseCase_CancellationKeepsPartialFile(t *testing.T) {
 	}
 
 	var logBuf bytes.Buffer
-	uc := NewDownloadUseCaseWithDir(service, dir).WithLogger(slog.New(slog.NewTextHandler(&logBuf, nil)))
+	uc := NewDownloadUseCaseWithOptions(service, DownloadOptions{
+		Dir:    dir,
+		Logger: slog.New(slog.NewTextHandler(&logBuf, nil)),
+	})
 
 	path, err := uc.Execute(context.Background(), "url", "720p")
 
@@ -113,7 +116,7 @@ func TestDownloaderUseCase_NonCancellationErrorReturnsError(t *testing.T) {
 		},
 	}
 
-	uc := NewDownloadUseCaseWithDir(service, dir)
+	uc := NewDownloadUseCaseWithOptions(service, DownloadOptions{Dir: dir})
 
 	_, err := uc.Execute(context.Background(), "url", "720p")
 	if !errors.Is(err, errSentinel) {
@@ -127,7 +130,7 @@ func TestDownloaderUseCase_SanitizesVideoTitle(t *testing.T) {
 		return &downloader.Video{Title: "../../outside"}, nil
 	}}
 
-	path, err := NewDownloadUseCaseWithDir(service, dir).Execute(context.Background(), "url", "720p")
+	path, err := NewDownloadUseCaseWithOptions(service, DownloadOptions{Dir: dir}).Execute(context.Background(), "url", "720p")
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -136,5 +139,27 @@ func TestDownloaderUseCase_SanitizesVideoTitle(t *testing.T) {
 	}
 	if filepath.Base(path) != "_.._outside.mp4" {
 		t.Errorf("unexpected sanitized name: %q", filepath.Base(path))
+	}
+}
+
+func TestDownloaderUseCase_DoesNotOverwriteExistingDownload(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "test.mp4")
+	if err := os.WriteFile(existing, []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path, err := NewDownloadUseCaseWithOptions(&mockService{}, DownloadOptions{Dir: dir}).Execute(context.Background(), "url", "720p")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if path != filepath.Join(dir, "test (1).mp4") {
+		t.Errorf("path = %q", path)
+	}
+	content, err := os.ReadFile(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "existing" {
+		t.Errorf("existing content was overwritten: %q", content)
 	}
 }

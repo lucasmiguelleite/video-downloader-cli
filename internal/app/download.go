@@ -20,9 +20,12 @@ type DownloadUseCase struct {
 
 // DownloadOptions configures a DownloadUseCase.
 type DownloadOptions struct {
-	Dir        string
+	// Dir is the output directory. Empty uses the user's Downloads directory.
+	Dir string
+	// NeedsRemux enables a final ffmpeg stream-copy remux.
 	NeedsRemux bool
-	Logger     *slog.Logger
+	// Logger receives lifecycle events. Nil uses slog.Default().
+	Logger *slog.Logger
 }
 
 // NewDownloadUseCaseWithOptions creates a configured download use case.
@@ -32,31 +35,6 @@ func NewDownloadUseCaseWithOptions(s downloader.Service, opts DownloadOptions) *
 		log = slog.Default()
 	}
 	return &DownloadUseCase{service: s, dir: opts.Dir, needsRemux: opts.NeedsRemux, log: log}
-}
-
-// NewDownloadUseCase creates a download use case using the default directory.
-func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
-	return NewDownloadUseCaseWithOptions(s, DownloadOptions{})
-}
-
-// NewDownloadUseCaseWithDir creates a download use case writing to dir.
-func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCase {
-	return NewDownloadUseCaseWithOptions(s, DownloadOptions{Dir: dir})
-}
-
-// NewDownloadUseCaseWithRemux creates a use case that remuxes HLS output.
-func NewDownloadUseCaseWithRemux(s downloader.Service, dir string) *DownloadUseCase {
-	return NewDownloadUseCaseWithOptions(s, DownloadOptions{Dir: dir, NeedsRemux: true})
-}
-
-// WithLogger attaches a structured logger. Returns the use case for chaining.
-// A nil logger resets to slog.Default().
-func (uc *DownloadUseCase) WithLogger(log *slog.Logger) *DownloadUseCase {
-	if log == nil {
-		log = slog.Default()
-	}
-	uc.log = log
-	return uc
 }
 
 // Execute resolves and downloads url at quality, returning the saved path.
@@ -84,6 +62,10 @@ func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (st
 
 	filename := fs.SafeFilename(video.Title, ".mp4")
 	path := filepath.Join(dir, filename)
+	path, err = fs.AvailablePath(path, uc.needsRemux)
+	if err != nil {
+		return "", err
+	}
 
 	uc.log.Info("download starting", "title", video.Title, "dir", dir, "quality", quality)
 
