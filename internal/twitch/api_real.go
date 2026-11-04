@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
+
+	"youtube-downloader/internal/httpbody"
 )
 
 const clientID = "ue6666qo983tsx6so1t0vnawi233wa"
+
+const maxResponseBytes = 32 << 20
 
 // RealAPI calls Twitch's production HTTP endpoints.
 type RealAPI struct {
@@ -106,11 +109,11 @@ func (api *RealAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("twitch playlist fetch returned HTTP %d for %s", resp.StatusCode, m3u8URL)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := httpbody.Read(resp.Body, maxResponseBytes)
 	if err != nil {
 		return "", err
 	}
@@ -129,15 +132,18 @@ func (api *RealAPI) FetchSegment(ctx context.Context, url string) ([]byte, error
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("twitch segment fetch returned HTTP %d for %s", resp.StatusCode, url)
 	}
 
-	return io.ReadAll(resp.Body)
+	return httpbody.Read(resp.Body, maxResponseBytes)
 }
 
 func (api *RealAPI) graphql(ctx context.Context, query string) ([]byte, error) {
-	body, _ := json.Marshal(map[string]string{"query": query})
+	body, err := json.Marshal(map[string]string{"query": query})
+	if err != nil {
+		return nil, fmt.Errorf("encode Twitch GraphQL query: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://gql.twitch.tv/gql", bytes.NewReader(body))
 	if err != nil {
@@ -156,7 +162,7 @@ func (api *RealAPI) graphql(ctx context.Context, query string) ([]byte, error) {
 		return nil, fmt.Errorf("twitch GraphQL returned status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	return httpbody.Read(resp.Body, maxResponseBytes)
 }
 
 // BuildUsherURL returns the authenticated Twitch VOD playlist URL.

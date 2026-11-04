@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/kkdai/youtube/v2"
 )
@@ -15,7 +16,7 @@ type RealAPI struct {
 
 // NewRealAPI creates the production YouTube API adapter.
 func NewRealAPI() *RealAPI {
-	return &RealAPI{}
+	return NewRealAPIWithHTTPClient(&http.Client{Timeout: 30 * time.Second})
 }
 
 // NewRealAPIWithHTTPClient creates a YouTube API adapter using client.

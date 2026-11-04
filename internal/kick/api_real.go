@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
+
+	"youtube-downloader/internal/httpbody"
 )
+
+const maxResponseBytes = 32 << 20
 
 // RealAPI calls Kick's production HTTP endpoints.
 type RealAPI struct {
@@ -54,8 +57,12 @@ func (api *RealAPI) FetchVideoInfo(ctx context.Context, videoID string) (*VideoI
 		} `json:"livestream"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	body, err := httpbody.Read(resp.Body, maxResponseBytes)
+	if err != nil {
+		return nil, fmt.Errorf("read Kick video response: %w", err)
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("decode Kick video response: %w", err)
 	}
 
 	title := result.Livestream.SessionTitle
@@ -80,11 +87,11 @@ func (api *RealAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("kick playlist fetch returned HTTP %d for %s", resp.StatusCode, m3u8URL)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := httpbody.Read(resp.Body, maxResponseBytes)
 	if err != nil {
 		return "", err
 	}
@@ -103,9 +110,9 @@ func (api *RealAPI) FetchSegment(ctx context.Context, url string) ([]byte, error
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("kick segment fetch returned HTTP %d for %s", resp.StatusCode, url)
 	}
 
-	return io.ReadAll(resp.Body)
+	return httpbody.Read(resp.Body, maxResponseBytes)
 }
