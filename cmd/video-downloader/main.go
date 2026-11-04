@@ -103,17 +103,39 @@ func main() {
 }
 
 func resolveService(rawURL string, concurrency int) (downloader.Service, bool, error) {
+	return resolveServiceWithFactories(rawURL, concurrency, defaultServiceFactories())
+}
+
+type serviceFactories struct {
+	kick    func(int) downloader.Service
+	twitch  func(int) downloader.Service
+	youtube func(int) downloader.Service
+}
+
+func defaultServiceFactories() serviceFactories {
+	return serviceFactories{
+		kick: func(concurrency int) downloader.Service {
+			return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency)
+		},
+		twitch: func(concurrency int) downloader.Service {
+			return twitch.NewClientWithConcurrency(twitch.NewRealAPI(), concurrency)
+		},
+		youtube: func(int) downloader.Service { return youtube.NewClient(youtube.NewRealAPI()) },
+	}
+}
+
+func resolveServiceWithFactories(rawURL string, concurrency int, factories serviceFactories) (downloader.Service, bool, error) {
 	provider, err := providerForURL(rawURL)
 	if err != nil {
 		return nil, false, err
 	}
 	switch provider {
 	case "kick":
-		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency), true, nil
+		return factories.kick(concurrency), true, nil
 	case "twitch":
-		return twitch.NewClientWithConcurrency(twitch.NewRealAPI(), concurrency), true, nil
+		return factories.twitch(concurrency), true, nil
 	case "youtube":
-		return youtube.NewClient(youtube.NewRealAPI()), false, nil
+		return factories.youtube(concurrency), false, nil
 	default:
 		return nil, false, fmt.Errorf("unsupported video provider %q", provider)
 	}
