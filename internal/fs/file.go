@@ -87,13 +87,50 @@ func RemuxToMP4(ctx context.Context, path string) error {
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", path, "-c", "copy", tmpPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("ffmpeg failed: %s: %w", string(output), err)
 	}
+	if err := replaceFile(path, tmpPath); err != nil {
+		return fmt.Errorf("replace original %q with remuxed output: %w", path, err)
+	}
+	return nil
+}
 
-	if err := os.Remove(path); err != nil {
+func replaceFile(originalPath, replacementPath string) error {
+	if err := os.Rename(replacementPath, originalPath); err == nil {
+		return nil
+	}
+	backup, err := unusedTempPath(filepath.Dir(originalPath), ".remux-backup-*")
+	if err != nil {
 		return err
 	}
+	if err := os.Rename(originalPath, backup); err != nil {
+		return fmt.Errorf("back up original to %q: %w", backup, err)
+	}
+	if err := os.Rename(replacementPath, originalPath); err != nil {
+		if restoreErr := os.Rename(backup, originalPath); restoreErr != nil {
+			return fmt.Errorf("install replacement: %w; restore original from %q: %v", err, backup, restoreErr)
+		}
+		return fmt.Errorf("install replacement: %w", err)
+	}
+	if err := os.Remove(backup); err != nil {
+		return fmt.Errorf("remove remux backup %q: %w", backup, err)
+	}
+	return nil
+}
 
-	return os.Rename(tmpPath, path)
+func unusedTempPath(dir, pattern string) (string, error) {
+	temp, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return "", err
+	}
+	path := temp.Name()
+	if err := temp.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := os.Remove(path); err != nil {
+		return "", err
+	}
+	return path, nil
 }

@@ -132,3 +132,44 @@ func TestRemuxToMP4_NoFFmpeg(t *testing.T) {
 		t.Error("expected error when ffmpeg is not available")
 	}
 }
+
+func TestReplaceFile_ReplacesOriginal(t *testing.T) {
+	dir := t.TempDir()
+	original := filepath.Join(dir, "video.mp4")
+	replacement := filepath.Join(dir, "remuxed.mp4")
+	if err := os.WriteFile(original, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(replacement, []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceFile(original, replacement); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new" {
+		t.Errorf("original content = %q", got)
+	}
+}
+
+func TestReplaceFile_RestoresOriginalWhenInstallFails(t *testing.T) {
+	dir := t.TempDir()
+	original := filepath.Join(dir, "video.mp4")
+	if err := os.WriteFile(original, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := replaceFile(original, filepath.Join(dir, "missing.mp4"))
+	if err == nil {
+		t.Fatal("expected replacement error")
+	}
+	got, readErr := os.ReadFile(original)
+	if readErr != nil {
+		t.Fatalf("original was not restored: %v", readErr)
+	}
+	if string(got) != "old" {
+		t.Errorf("restored content = %q", got)
+	}
+}
