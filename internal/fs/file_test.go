@@ -2,9 +2,12 @@ package fs
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestCreate(t *testing.T) {
@@ -67,18 +70,39 @@ func TestSafeFilename_RemovesPathSeparators(t *testing.T) {
 	}
 }
 
+func TestSafeFilename_LimitsUTF8ByteLength(t *testing.T) {
+	got := SafeFilename(strings.Repeat("é", 200), ".mp4")
+	if len(got) > maxFilenameBytes {
+		t.Errorf("filename is %d bytes", len(got))
+	}
+	if !utf8.ValidString(got) {
+		t.Errorf("filename is invalid UTF-8: %q", got)
+	}
+	if !strings.HasSuffix(got, ".mp4") {
+		t.Errorf("extension was lost: %q", got)
+	}
+}
+
+func TestSafeFilename_ReplacesPortableInvalidCharacters(t *testing.T) {
+	got := SafeFilename(`a<b>:c"d|e?f*g`, ".mp4")
+	if strings.ContainsAny(got, `<>:"|?*`) {
+		t.Errorf("filename contains invalid characters: %q", got)
+	}
+}
+
 func TestAvailablePath_AppendsCounter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "video.mp4")
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := AvailablePath(path, false)
+	reservation, err := ReservePath(path, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != filepath.Join(dir, "video (1).mp4") {
-		t.Errorf("AvailablePath() = %q", got)
+	t.Cleanup(func() { _ = reservation.Release() })
+	if reservation.Path != filepath.Join(dir, "video (1).mp4") {
+		t.Errorf("ReservePath() = %q", reservation.Path)
 	}
 }
 
@@ -91,12 +115,13 @@ func TestAvailablePath_PreservesResumePath(t *testing.T) {
 	if err := os.WriteFile(path+".part", []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := AvailablePath(path, true)
+	reservation, err := ReservePath(path, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != path {
-		t.Errorf("AvailablePath() = %q, want resume path %q", got, path)
+	t.Cleanup(func() { _ = reservation.Release() })
+	if reservation.Path != path {
+		t.Errorf("ReservePath() = %q, want resume path %q", reservation.Path, path)
 	}
 }
 
@@ -109,12 +134,46 @@ func TestAvailablePath_IgnoresResumeSidecarWhenResumeDisabled(t *testing.T) {
 	if err := os.WriteFile(path+".part", []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := AvailablePath(path, false)
+	reservation, err := ReservePath(path, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != filepath.Join(dir, "video (1).mp4") {
-		t.Errorf("AvailablePath() = %q", got)
+	t.Cleanup(func() { _ = reservation.Release() })
+	if reservation.Path != filepath.Join(dir, "video (1).mp4") {
+		t.Errorf("ReservePath() = %q", reservation.Path)
+	}
+}
+
+func TestReservePath_ConcurrentReservationsUseDifferentNames(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "video.mp4")
+	first, err := ReservePath(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = first.Release() })
+	second, err := ReservePath(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = second.Release() })
+	if first.Path == second.Path {
+		t.Fatalf("concurrent reservations both selected %q", first.Path)
+	}
+}
+
+func TestReservePath_RejectsConcurrentResume(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "video.mp4")
+	if err := os.WriteFile(path+".part", []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	first, err := ReservePath(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = first.Release() })
+	_, err = ReservePath(path, true)
+	if !errors.Is(err, ErrPathReserved) {
+		t.Fatalf("expected ErrPathReserved, got %v", err)
 	}
 }
 

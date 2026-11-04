@@ -8,7 +8,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
+
+const maxFilenameBytes = 255
+
+// ErrPathReserved indicates another process is using a resumable output path.
+var ErrPathReserved = errors.New("output path is reserved")
 
 // DefaultDownloadDir returns the user's conventional Downloads directory.
 func DefaultDownloadDir() (string, error) {
@@ -24,7 +30,7 @@ func DefaultDownloadDir() (string, error) {
 // caller-selected directory.
 func SafeFilename(title, extension string) string {
 	title = strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == 0 || r < 32 {
+		if r == '/' || r == '\\' || r == 0 || r < 32 || strings.ContainsRune(`<>:"|?*`, r) {
 			return '_'
 		}
 		return r
@@ -33,34 +39,138 @@ func SafeFilename(title, extension string) string {
 	if title == "" {
 		title = "video"
 	}
+	if isReservedFilename(title) {
+		title = "_" + title
+	}
+	title = truncateUTF8(title, maxFilenameBytes-len(extension))
 	return title + extension
 }
 
-// AvailablePath returns path when unused, or when preserveResume is true and
-// an HLS resume sidecar exists. Otherwise it returns a numbered sibling.
-func AvailablePath(path string, preserveResume bool) (string, error) {
+// PathReservation holds an atomically reserved output path.
+type PathReservation struct {
+	Path     string
+	lockPath string
+}
+
+// ReservePath atomically reserves path or the first unused numbered sibling.
+// A resumable path with a .part sidecar keeps its original name.
+func ReservePath(path string, preserveResume bool) (*PathReservation, error) {
 	if preserveResume {
-		if _, err := os.Stat(path + ".part"); err == nil {
-			return path, nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("stat resume sidecar %q: %w", path+".part", err)
+		exists, err := exists(path + ".part")
+		if err != nil {
+			return nil, fmt.Errorf("stat resume sidecar %q: %w", path+".part", err)
 		}
-	}
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return path, nil
-	} else if err != nil {
-		return "", fmt.Errorf("stat output path %q: %w", path, err)
+		if exists {
+			reservation, acquired, err := tryReserve(path)
+			if err != nil {
+				return nil, err
+			}
+			if !acquired {
+				return nil, fmt.Errorf("%w: %s", ErrPathReserved, path)
+			}
+			return reservation, nil
+		}
 	}
 	ext := filepath.Ext(path)
 	base := strings.TrimSuffix(path, ext)
-	for i := 1; ; i++ {
-		candidate := fmt.Sprintf("%s (%d)%s", base, i, ext)
-		if _, err := os.Stat(candidate); errors.Is(err, os.ErrNotExist) {
-			return candidate, nil
-		} else if err != nil {
-			return "", fmt.Errorf("stat output candidate %q: %w", candidate, err)
+	for i := 0; ; i++ {
+		candidate := path
+		if i > 0 {
+			candidate = fmt.Sprintf("%s (%d)%s", base, i, ext)
 		}
+		reservation, acquired, err := tryReserve(candidate)
+		if err != nil {
+			return nil, err
+		}
+		if !acquired {
+			continue
+		}
+		unavailable, err := hasOutputState(candidate)
+		if err != nil {
+			_ = reservation.Release()
+			return nil, err
+		}
+		if unavailable {
+			_ = reservation.Release()
+			continue
+		}
+		return reservation, nil
 	}
+}
+
+// Release releases the output-path reservation. It is idempotent.
+func (r *PathReservation) Release() error {
+	if r == nil || r.lockPath == "" {
+		return nil
+	}
+	err := os.Remove(r.lockPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+func tryReserve(path string) (*PathReservation, bool, error) {
+	lockPath := path + ".lock"
+	lock, err := os.OpenFile(lockPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if errors.Is(err, os.ErrExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("reserve output path %q: %w", path, err)
+	}
+	if _, err := fmt.Fprintf(lock, "pid=%d\n", os.Getpid()); err != nil {
+		_ = lock.Close()
+		_ = os.Remove(lockPath)
+		return nil, false, fmt.Errorf("write output reservation %q: %w", lockPath, err)
+	}
+	if err := lock.Close(); err != nil {
+		_ = os.Remove(lockPath)
+		return nil, false, fmt.Errorf("close output reservation %q: %w", lockPath, err)
+	}
+	return &PathReservation{Path: path, lockPath: lockPath}, true, nil
+}
+
+func hasOutputState(path string) (bool, error) {
+	outputExists, err := exists(path)
+	if err != nil {
+		return false, fmt.Errorf("stat output path %q: %w", path, err)
+	}
+	partExists, err := exists(path + ".part")
+	if err != nil {
+		return false, fmt.Errorf("stat resume sidecar %q: %w", path+".part", err)
+	}
+	return outputExists || partExists, nil
+}
+
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
+func truncateUTF8(value string, maxBytes int) string {
+	if maxBytes < 1 {
+		return ""
+	}
+	for len(value) > maxBytes {
+		_, size := utf8.DecodeLastRuneInString(value)
+		value = value[:len(value)-size]
+	}
+	return value
+}
+
+func isReservedFilename(name string) bool {
+	upper := strings.ToUpper(name)
+	if upper == "CON" || upper == "PRN" || upper == "AUX" || upper == "NUL" {
+		return true
+	}
+	return len(upper) == 4 && (strings.HasPrefix(upper, "COM") || strings.HasPrefix(upper, "LPT")) && upper[3] >= '1' && upper[3] <= '9'
 }
 
 // MkdirAll creates dir and any missing parent directories.

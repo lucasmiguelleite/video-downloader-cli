@@ -42,7 +42,7 @@ func NewDownloadUseCaseWithOptions(s downloader.Service, opts DownloadOptions) *
 }
 
 // Execute resolves and downloads url at quality, returning the saved path.
-func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (string, error) {
+func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (resultPath string, resultErr error) {
 	video, err := uc.service.GetVideo(ctx, url)
 	if err != nil {
 		uc.log.Error("failed to resolve video", "url", url, "err", err)
@@ -66,10 +66,16 @@ func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (st
 
 	filename := fs.SafeFilename(video.Title, ".mp4")
 	path := filepath.Join(dir, filename)
-	path, err = fs.AvailablePath(path, uc.needsRemux)
+	reservation, err := fs.ReservePath(path, uc.needsRemux)
 	if err != nil {
 		return "", err
 	}
+	path = reservation.Path
+	defer func() {
+		if err := reservation.Release(); err != nil && resultErr == nil {
+			resultErr = fmt.Errorf("release output reservation for %q: %w", path, err)
+		}
+	}()
 
 	uc.log.Info("download starting", "title", video.Title, "dir", dir, "quality", quality)
 
