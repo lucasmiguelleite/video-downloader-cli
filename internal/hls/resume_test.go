@@ -28,6 +28,9 @@ func TestManifest_SaveAndLoad(t *testing.T) {
 	if loaded.Completed != 1 {
 		t.Errorf("expected Completed=1, got %d", loaded.Completed)
 	}
+	if loaded.Bytes != 0 {
+		t.Errorf("expected Bytes=0, got %d", loaded.Bytes)
+	}
 	if len(loaded.Segments) != 2 {
 		t.Errorf("expected 2 segments, got %d", len(loaded.Segments))
 	}

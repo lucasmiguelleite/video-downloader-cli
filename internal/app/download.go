@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"path/filepath"
 
@@ -11,6 +10,7 @@ import (
 	"youtube-downloader/internal/fs"
 )
 
+// DownloadUseCase coordinates video resolution, download, and optional remux.
 type DownloadUseCase struct {
 	service    downloader.Service
 	dir        string
@@ -18,14 +18,17 @@ type DownloadUseCase struct {
 	log        *slog.Logger
 }
 
+// NewDownloadUseCase creates a download use case using the default directory.
 func NewDownloadUseCase(s downloader.Service) *DownloadUseCase {
 	return &DownloadUseCase{service: s, log: slog.Default()}
 }
 
+// NewDownloadUseCaseWithDir creates a download use case writing to dir.
 func NewDownloadUseCaseWithDir(s downloader.Service, dir string) *DownloadUseCase {
 	return &DownloadUseCase{service: s, dir: dir, log: slog.Default()}
 }
 
+// NewDownloadUseCaseWithRemux creates a use case that remuxes HLS output.
 func NewDownloadUseCaseWithRemux(s downloader.Service, dir string) *DownloadUseCase {
 	return &DownloadUseCase{service: s, dir: dir, needsRemux: true, log: slog.Default()}
 }
@@ -40,6 +43,7 @@ func (uc *DownloadUseCase) WithLogger(log *slog.Logger) *DownloadUseCase {
 	return uc
 }
 
+// Execute resolves and downloads url at quality, returning the saved path.
 func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (string, error) {
 	video, err := uc.service.GetVideo(ctx, url)
 	if err != nil {
@@ -62,7 +66,7 @@ func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (st
 		return "", err
 	}
 
-	filename := fmt.Sprintf("%s.mp4", video.Title)
+	filename := fs.SafeFilename(video.Title, ".mp4")
 	path := filepath.Join(dir, filename)
 
 	uc.log.Info("download starting", "title", video.Title, "dir", dir, "quality", quality)

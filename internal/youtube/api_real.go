@@ -7,10 +7,12 @@ import (
 	"github.com/kkdai/youtube/v2"
 )
 
+// RealAPI adapts the kkdai YouTube client to YouTubeAPI.
 type RealAPI struct {
 	client youtube.Client
 }
 
+// NewRealAPI creates the production YouTube API adapter.
 func NewRealAPI() *RealAPI {
 	return &RealAPI{}
 }

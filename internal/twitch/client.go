@@ -11,15 +11,18 @@ import (
 
 var vodIDRegex = regexp.MustCompile(`twitch\.tv/(?:[^/]+/v(?:ideo)?|videos)/(\d+)|twitch\.tv/.*[?&]video=v?(\d+)`)
 
+// Client downloads Twitch VODs through a TwitchAPI.
 type Client struct {
 	api         TwitchAPI
 	concurrency int
 }
 
+// NewClient creates a Twitch downloader with the default concurrency.
 func NewClient(api TwitchAPI) *Client {
 	return &Client{api: api, concurrency: 20}
 }
 
+// NewClientWithConcurrency creates a Twitch downloader with bounded concurrency.
 func NewClientWithConcurrency(api TwitchAPI, concurrency int) *Client {
 	if concurrency < 1 {
 		concurrency = 1
@@ -27,6 +30,7 @@ func NewClientWithConcurrency(api TwitchAPI, concurrency int) *Client {
 	return &Client{api: api, concurrency: concurrency}
 }
 
+// GetVideo resolves Twitch VOD metadata from url.
 func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, error) {
 	vodID := extractVodID(url)
 	if vodID == "" {
@@ -35,7 +39,7 @@ func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, e
 
 	info, err := c.api.FetchVideoInfo(ctx, vodID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetch Twitch video %s: %w", vodID, err)
 	}
 
 	return &downloader.Video{
@@ -44,42 +48,52 @@ func (c *Client) GetVideo(ctx context.Context, url string) (*downloader.Video, e
 	}, nil
 }
 
+// Download fetches and writes a Twitch VOD to outputPath.
 func (c *Client) Download(ctx context.Context, video *downloader.Video, quality, outputPath string) error {
 	token, err := c.api.FetchAccessToken(ctx, video.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch Twitch access token for %s: %w", video.URL, err)
 	}
 
 	usherURL := BuildUsherURL(video.URL, token)
 
 	playlist, err := c.api.FetchPlaylist(ctx, usherURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch Twitch master playlist %s: %w", usherURL, err)
 	}
 
 	segmentURL := usherURL
 
 	if hls.IsMasterPlaylist(playlist) {
-		segmentURL = hls.SelectVariant(usherURL, playlist, quality)
+		segmentURL, err = hls.SelectVariant(usherURL, playlist, quality)
+		if err != nil {
+			return fmt.Errorf("select Twitch stream variant: %w", err)
+		}
 		if segmentURL == "" {
 			return fmt.Errorf("no matching variant found for quality %s", quality)
 		}
 
 		playlist, err = c.api.FetchPlaylist(ctx, segmentURL)
 		if err != nil {
-			return err
+			return fmt.Errorf("fetch Twitch media playlist %s: %w", segmentURL, err)
 		}
 	}
 
-	segments := hls.ParseSegments(segmentURL, playlist)
+	segments, err := hls.ParseSegments(segmentURL, playlist)
+	if err != nil {
+		return fmt.Errorf("parse Twitch media playlist: %w", err)
+	}
 	if len(segments) == 0 {
 		return fmt.Errorf("no segments found in playlist")
 	}
 
-	return hls.FetchSegments(ctx, segments, hls.FetchOptions{
+	if err := hls.FetchSegments(ctx, segments, hls.FetchOptions{
 		Concurrency: c.concurrency,
 		Fetch:       c.api.FetchSegment,
-	}, outputPath)
+	}, outputPath); err != nil {
+		return fmt.Errorf("download Twitch segments: %w", err)
+	}
+	return nil
 }
 
 func extractVodID(url string) string {

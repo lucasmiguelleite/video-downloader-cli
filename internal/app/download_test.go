@@ -120,3 +120,21 @@ func TestDownloaderUseCase_NonCancellationErrorReturnsError(t *testing.T) {
 		t.Errorf("expected sentinel error, got: %v", err)
 	}
 }
+
+func TestDownloaderUseCase_SanitizesVideoTitle(t *testing.T) {
+	dir := t.TempDir()
+	service := &mockService{getVideoFn: func(context.Context, string) (*downloader.Video, error) {
+		return &downloader.Video{Title: "../../outside"}, nil
+	}}
+
+	path, err := NewDownloadUseCaseWithDir(service, dir).Execute(context.Background(), "url", "720p")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if filepath.Dir(path) != dir {
+		t.Fatalf("download escaped output directory: %q", path)
+	}
+	if filepath.Base(path) != "_.._outside.mp4" {
+		t.Errorf("unexpected sanitized name: %q", filepath.Base(path))
+	}
+}

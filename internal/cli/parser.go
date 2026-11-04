@@ -6,8 +6,10 @@ import (
 	"os"
 )
 
+// Version identifies the build version shown by the CLI.
 var Version = "dev"
 
+// Input contains validated command-line flag values.
 type Input struct {
 	URL         string
 	Quality     string
@@ -18,6 +20,7 @@ type Input struct {
 	ShowVersion bool
 }
 
+// ParseArgs parses video-downloader command-line arguments.
 func ParseArgs(args []string) (Input, error) {
 	fs := flag.NewFlagSet("youtube-downloader", flag.ContinueOnError)
 

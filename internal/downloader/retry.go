@@ -6,22 +6,18 @@ import (
 	"time"
 )
 
-// RetryConfig controls WithRetry timing. The zero value falls back to sane
-// defaults at call time, so callers only need to set the fields they care
-// about.
+// RetryConfig controls WithRetry timing. Zero Base and Max values use the
+// production defaults. A zero Jitter explicitly disables jitter.
 type RetryConfig struct {
 	// Base is the first backoff sleep. Defaults to 500ms.
 	Base time.Duration
 	// Max caps a single backoff sleep. Defaults to 30s.
 	Max time.Duration
-	// Jitter is the +/- random spread added to each sleep. Defaults to 250ms.
+	// Jitter is the +/- random spread added to each sleep. Zero disables it.
 	Jitter time.Duration
 }
 
-// DefaultRetryConfig is the backoff configuration used by WithRetry when no
-// override is supplied. Tests may temporarily shorten it to keep the suite
-// fast; production code should leave it alone.
-var DefaultRetryConfig = RetryConfig{
+var defaultRetryConfig = RetryConfig{
 	Base:   500 * time.Millisecond,
 	Max:    30 * time.Second,
 	Jitter: 250 * time.Millisecond,
@@ -30,15 +26,10 @@ var DefaultRetryConfig = RetryConfig{
 func (c RetryConfig) withDefaults() RetryConfig {
 	cfg := c
 	if cfg.Base <= 0 {
-		cfg.Base = DefaultRetryConfig.Base
+		cfg.Base = defaultRetryConfig.Base
 	}
 	if cfg.Max <= 0 {
-		cfg.Max = DefaultRetryConfig.Max
-	}
-	// Jitter may legitimately be 0 (disable), so only fall back when unset
-	// AND identical to the zero value would matter — keep it explicit:
-	if cfg.Jitter < 0 {
-		cfg.Jitter = DefaultRetryConfig.Jitter
+		cfg.Max = defaultRetryConfig.Max
 	}
 	return cfg
 }
@@ -51,13 +42,14 @@ func (c RetryConfig) withDefaults() RetryConfig {
 // attempts must be >= 1. If fn returns nil, WithRetry returns nil right away
 // (no extra calls).
 //
-// Uses DefaultRetryConfig. Use WithRetryConfig to customise timing.
+// Uses the package's immutable production defaults. Use WithRetryConfig to
+// customise timing.
 func WithRetry(ctx context.Context, attempts int, fn func() error) error {
-	return WithRetryConfig(ctx, attempts, DefaultRetryConfig, fn)
+	return WithRetryConfig(ctx, attempts, defaultRetryConfig, fn)
 }
 
-// WithRetryConfig is the configurable variant. cfg's zero fields fall back to
-// the defaults from DefaultRetryConfig.
+// WithRetryConfig is the configurable variant. Zero Base and Max fields use
+// production defaults; zero Jitter disables random jitter.
 func WithRetryConfig(ctx context.Context, attempts int, cfg RetryConfig, fn func() error) error {
 	if attempts < 1 {
 		attempts = 1

@@ -60,6 +60,13 @@ func TestDefaultDownloadDir(t *testing.T) {
 	}
 }
 
+func TestSafeFilename_RemovesPathSeparators(t *testing.T) {
+	got := SafeFilename("../folder\\video", ".mp4")
+	if got != "_folder_video.mp4" {
+		t.Errorf("SafeFilename() = %q", got)
+	}
+}
+
 func TestRemuxToMP4_NoFFmpeg(t *testing.T) {
 	dir := t.TempDir()
 	fakePath := filepath.Join(dir, "video.mp4")

@@ -69,3 +69,39 @@ func TestDownload(t *testing.T) {
 		t.Errorf("invalid content")
 	}
 }
+
+func TestSelectFormat_PrefersRequestedQuality(t *testing.T) {
+	formats := youtube.FormatList{{QualityLabel: "1080p"}, {QualityLabel: "720p"}, {QualityLabel: "480p"}}
+	format, err := selectFormat(formats, "720p")
+	if err != nil {
+		t.Fatalf("selectFormat: %v", err)
+	}
+	if format.QualityLabel != "720p" {
+		t.Errorf("selected %q, want 720p", format.QualityLabel)
+	}
+}
+
+func TestSelectFormat_FallsBackToHighestAvailableBelowRequested(t *testing.T) {
+	formats := youtube.FormatList{{QualityLabel: "1080p"}, {QualityLabel: "480p"}}
+	format, err := selectFormat(formats, "720p")
+	if err != nil {
+		t.Fatalf("selectFormat: %v", err)
+	}
+	if format.QualityLabel != "480p" {
+		t.Errorf("selected %q, want 480p", format.QualityLabel)
+	}
+}
+
+func TestSelectFormat_InvalidQuality(t *testing.T) {
+	_, err := selectFormat(youtube.FormatList{{QualityLabel: "720p"}}, "highest")
+	if err == nil {
+		t.Fatal("expected invalid quality error")
+	}
+}
+
+func TestSelectFormat_ReturnsErrorWhenNoPlayableFormatExists(t *testing.T) {
+	_, err := selectFormat(youtube.FormatList{{QualityLabel: "audio"}}, "720p")
+	if err == nil {
+		t.Fatal("expected no playable format error")
+	}
+}

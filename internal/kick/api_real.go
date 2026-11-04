@@ -9,10 +9,12 @@ import (
 	"time"
 )
 
+// RealAPI calls Kick's production HTTP endpoints.
 type RealAPI struct {
 	client *http.Client
 }
 
+// NewRealAPI creates a production Kick HTTP client.
 func NewRealAPI() *RealAPI {
 	return &RealAPI{
 		client: &http.Client{Timeout: 30 * time.Second},

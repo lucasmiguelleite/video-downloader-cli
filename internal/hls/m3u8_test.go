@@ -1,6 +1,9 @@
 package hls
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseSegments(t *testing.T) {
 	playlist := `#EXTM3U
@@ -13,7 +16,10 @@ https://cdn.example.com/seg2.ts
 https://cdn.example.com/seg3.ts
 #EXT-X-ENDLIST`
 
-	segments := ParseSegments("https://cdn.example.com/playlist.m3u8", playlist)
+	segments, err := ParseSegments("https://cdn.example.com/playlist.m3u8", playlist)
+	if err != nil {
+		t.Fatalf("ParseSegments: %v", err)
+	}
 
 	if len(segments) != 3 {
 		t.Fatalf("expected 3 segments, got %d", len(segments))
@@ -41,7 +47,10 @@ segment1.ts
 segment2.ts
 #EXT-X-ENDLIST`
 
-	segments := ParseSegments("https://cdn.example.com/video/playlist.m3u8", playlist)
+	segments, err := ParseSegments("https://cdn.example.com/video/playlist.m3u8", playlist)
+	if err != nil {
+		t.Fatalf("ParseSegments: %v", err)
+	}
 
 	if len(segments) != 2 {
 		t.Fatalf("expected 2 segments, got %d", len(segments))
@@ -57,7 +66,10 @@ segment2.ts
 }
 
 func TestParseSegments_EmptyPlaylist(t *testing.T) {
-	segments := ParseSegments("https://example.com/playlist.m3u8", "")
+	segments, err := ParseSegments("https://example.com/playlist.m3u8", "")
+	if err != nil {
+		t.Fatalf("ParseSegments: %v", err)
+	}
 
 	if len(segments) != 0 {
 		t.Errorf("expected 0 segments, got %d", len(segments))
@@ -94,7 +106,10 @@ https://cdn.example.com/720p/index.m3u8
 #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=854x480
 https://cdn.example.com/480p/index.m3u8`
 
-	url := SelectVariant("https://cdn.example.com/master.m3u8", master, "720p")
+	url, err := SelectVariant("https://cdn.example.com/master.m3u8", master, "720p")
+	if err != nil {
+		t.Fatalf("SelectVariant: %v", err)
+	}
 
 	if url != "https://cdn.example.com/720p/index.m3u8" {
 		t.Errorf("expected 720p variant, got %s", url)
@@ -108,9 +123,27 @@ https://cdn.example.com/1080p/index.m3u8
 #EXT-X-STREAM-INF:BANDWIDTH=2000000,RESOLUTION=1280x720
 https://cdn.example.com/720p/index.m3u8`
 
-	url := SelectVariant("https://cdn.example.com/master.m3u8", master, "4k")
+	url, err := SelectVariant("https://cdn.example.com/master.m3u8", master, "4k")
+	if err != nil {
+		t.Fatalf("SelectVariant: %v", err)
+	}
 
 	if url != "https://cdn.example.com/1080p/index.m3u8" {
 		t.Errorf("expected first variant as fallback, got %s", url)
+	}
+}
+
+func TestParseSegments_InvalidBaseURL(t *testing.T) {
+	_, err := ParseSegments("://bad", "segment.ts")
+	if err == nil {
+		t.Fatal("expected invalid base URL error")
+	}
+}
+
+func TestParseSegments_ReturnsScannerError(t *testing.T) {
+	playlist := strings.Repeat("x", 64*1024+1)
+	_, err := ParseSegments("https://cdn.example.com/playlist.m3u8", playlist)
+	if err == nil {
+		t.Fatal("expected scanner error for oversized playlist line")
 	}
 }

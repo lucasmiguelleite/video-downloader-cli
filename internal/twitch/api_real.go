@@ -13,10 +13,12 @@ import (
 
 const clientID = "ue6666qo983tsx6so1t0vnawi233wa"
 
+// RealAPI calls Twitch's production HTTP endpoints.
 type RealAPI struct {
 	client *http.Client
 }
 
+// NewRealAPI creates a production Twitch HTTP client.
 func NewRealAPI() *RealAPI {
 	return &RealAPI{client: &http.Client{Timeout: 30 * time.Second}}
 }
@@ -149,6 +151,7 @@ func (api *RealAPI) graphql(ctx context.Context, query string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// BuildUsherURL returns the authenticated Twitch VOD playlist URL.
 func BuildUsherURL(videoID string, token *AccessToken) string {
 	params := url.Values{}
 	params.Set("sig", token.Signature)

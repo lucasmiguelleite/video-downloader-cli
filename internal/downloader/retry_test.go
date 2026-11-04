@@ -118,20 +118,20 @@ func TestWithRetry_BackoffIsCancellable(t *testing.T) {
 
 func TestDefaultRetryConfig_HasSaneProductionValues(t *testing.T) {
 	// Guard against accidentally zeroing the production backoff.
-	if DefaultRetryConfig.Base <= 0 {
-		t.Errorf("expected positive base backoff, got %v", DefaultRetryConfig.Base)
+	if defaultRetryConfig.Base <= 0 {
+		t.Errorf("expected positive base backoff, got %v", defaultRetryConfig.Base)
 	}
-	if DefaultRetryConfig.Max < DefaultRetryConfig.Base {
-		t.Errorf("max backoff %v should be >= base %v", DefaultRetryConfig.Max, DefaultRetryConfig.Base)
+	if defaultRetryConfig.Max < defaultRetryConfig.Base {
+		t.Errorf("max backoff %v should be >= base %v", defaultRetryConfig.Max, defaultRetryConfig.Base)
 	}
 }
 
 func TestRetryConfig_ZeroFieldsFallBackToDefaults(t *testing.T) {
 	cfg := RetryConfig{}.withDefaults()
-	if cfg.Base != DefaultRetryConfig.Base {
+	if cfg.Base != defaultRetryConfig.Base {
 		t.Errorf("expected default base, got %v", cfg.Base)
 	}
-	if cfg.Max != DefaultRetryConfig.Max {
+	if cfg.Max != defaultRetryConfig.Max {
 		t.Errorf("expected default max, got %v", cfg.Max)
 	}
 	// Explicit zero jitter should be preserved (it's a valid "disable jitter".

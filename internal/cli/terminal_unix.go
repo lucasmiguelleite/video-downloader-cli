@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// IsRunningInBackground reports whether stdin's process group is backgrounded.
 func IsRunningInBackground(stdin *os.File) (bool, error) {
 	foregroundProcessGroupID, err := unix.IoctlGetInt(int(stdin.Fd()), unix.TIOCGPGRP)
 	if err != nil {

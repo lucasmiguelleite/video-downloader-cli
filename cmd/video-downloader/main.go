@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"youtube-downloader/internal/app"
@@ -72,7 +72,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	service, needsRemux := resolveService(input.URL, input.Concurrency)
+	service, needsRemux, err := resolveService(input.URL, input.Concurrency)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 
 	logger := cli.NewLogger(os.Stderr, input.Verbose)
 	slog.SetDefault(logger)
@@ -104,12 +108,37 @@ func main() {
 	fmt.Printf("Saved to: %s\n", path)
 }
 
-func resolveService(url string, concurrency int) (downloader.Service, bool) {
-	if strings.Contains(url, "kick.com") {
-		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency), true
+func resolveService(rawURL string, concurrency int) (downloader.Service, bool, error) {
+	provider, err := providerForURL(rawURL)
+	if err != nil {
+		return nil, false, err
 	}
-	if strings.Contains(url, "twitch.tv") {
-		return twitch.NewClientWithConcurrency(twitch.NewRealAPI(), concurrency), true
+	switch provider {
+	case "kick":
+		return kick.NewClientWithConcurrency(kick.NewRealAPI(), concurrency), true, nil
+	case "twitch":
+		return twitch.NewClientWithConcurrency(twitch.NewRealAPI(), concurrency), true, nil
+	case "youtube":
+		return youtube.NewClient(youtube.NewRealAPI()), false, nil
+	default:
+		return nil, false, fmt.Errorf("unsupported video provider %q", provider)
 	}
-	return youtube.NewClient(youtube.NewRealAPI()), false
+}
+
+func providerForURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" {
+		return "", fmt.Errorf("invalid video URL %q; expected an absolute HTTPS URL", rawURL)
+	}
+	host := parsed.Hostname()
+	switch host {
+	case "kick.com", "www.kick.com":
+		return "kick", nil
+	case "twitch.tv", "www.twitch.tv", "player.twitch.tv":
+		return "twitch", nil
+	case "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be":
+		return "youtube", nil
+	default:
+		return "", fmt.Errorf("unsupported video host %q", host)
+	}
 }

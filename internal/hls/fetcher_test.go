@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -47,6 +48,15 @@ func TestFetchSegments_WritesAllSegmentsInOrder(t *testing.T) {
 	expected := "data1data2data3data4"
 	if string(got) != expected {
 		t.Errorf("expected %q, got %q", expected, string(got))
+	}
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".segment-") {
+			t.Errorf("staged segment file %q was not removed", entry.Name())
+		}
 	}
 }
 
@@ -183,11 +193,6 @@ func TestFetchSegments_EmptySegmentList(t *testing.T) {
 }
 
 func TestFetchSegments_RetriesTransientSegmentFailure(t *testing.T) {
-	// Speed up backoff for this test.
-	orig := downloader.DefaultRetryConfig
-	downloader.DefaultRetryConfig = downloader.RetryConfig{Base: time.Millisecond, Max: 5 * time.Millisecond, Jitter: 0}
-	t.Cleanup(func() { downloader.DefaultRetryConfig = orig })
-
 	segments := []string{
 		"https://cdn.example.com/flaky.ts",
 		"https://cdn.example.com/stable.ts",
@@ -200,7 +205,8 @@ func TestFetchSegments_RetriesTransientSegmentFailure(t *testing.T) {
 	})
 
 	path := filepath.Join(t.TempDir(), "out.ts")
-	err := FetchSegments(context.Background(), segments, FetchOptions{Concurrency: 2, Fetch: fetch}, path)
+	cfg := downloader.RetryConfig{Base: time.Millisecond, Max: 5 * time.Millisecond}
+	err := FetchSegments(context.Background(), segments, FetchOptions{Concurrency: 2, Fetch: fetch, RetryAttempts: 3, RetryConfig: &cfg}, path)
 	if err != nil {
 		t.Fatalf("expected retry to recover, got: %v", err)
 	}
@@ -253,7 +259,7 @@ func TestFetchSegments_ResumeSkipsCompletedSegments(t *testing.T) {
 	if err := os.WriteFile(path, []byte("d1d2"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sidecar := &Manifest{Segments: segments, Completed: 2}
+	sidecar := &Manifest{Segments: segments, Completed: 2, Bytes: int64(len("d1d2"))}
 	if err := sidecar.Save(path + ".part"); err != nil {
 		t.Fatal(err)
 	}
@@ -283,6 +289,69 @@ func TestFetchSegments_ResumeSkipsCompletedSegments(t *testing.T) {
 	}
 	if _, err := os.Stat(path + ".part"); !os.IsNotExist(err) {
 		t.Errorf("sidecar should be deleted after completion, got stat err: %v", err)
+	}
+}
+
+func TestFetchSegments_TruncatedPartialFileStartsOver(t *testing.T) {
+	segments := []string{"https://cdn.example.com/seg1.ts", "https://cdn.example.com/seg2.ts"}
+	data := map[string][]byte{segments[0]: []byte("d1"), segments[1]: []byte("d2")}
+	path := filepath.Join(t.TempDir(), "out.ts")
+	if err := os.WriteFile(path, []byte("d"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&Manifest{Segments: segments, Completed: 1, Bytes: 2}).Save(path + ".part"); err != nil {
+		t.Fatal(err)
+	}
+	if err := FetchSegments(context.Background(), segments, FetchOptions{Fetch: writeFetch(data)}, path); err != nil {
+		t.Fatalf("FetchSegments: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "d1d2" {
+		t.Errorf("output = %q, want fresh download", got)
+	}
+}
+
+func TestFetchSegments_MissingPartialFileStartsOver(t *testing.T) {
+	segments := []string{"https://cdn.example.com/seg1.ts"}
+	data := map[string][]byte{segments[0]: []byte("d1")}
+	path := filepath.Join(t.TempDir(), "out.ts")
+	if err := (&Manifest{Segments: segments, Completed: 1, Bytes: 2}).Save(path + ".part"); err != nil {
+		t.Fatal(err)
+	}
+	if err := FetchSegments(context.Background(), segments, FetchOptions{Fetch: writeFetch(data)}, path); err != nil {
+		t.Fatalf("FetchSegments: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "d1" {
+		t.Errorf("output = %q, want fresh download", got)
+	}
+}
+
+func TestFetchSegments_OversizedPartialFileStartsOver(t *testing.T) {
+	segments := []string{"https://cdn.example.com/seg1.ts"}
+	data := map[string][]byte{segments[0]: []byte("d1")}
+	path := filepath.Join(t.TempDir(), "out.ts")
+	if err := os.WriteFile(path, []byte("d1extra"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&Manifest{Segments: segments, Completed: 1, Bytes: 2}).Save(path + ".part"); err != nil {
+		t.Fatal(err)
+	}
+	if err := FetchSegments(context.Background(), segments, FetchOptions{Fetch: writeFetch(data)}, path); err != nil {
+		t.Fatalf("FetchSegments: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "d1" {
+		t.Errorf("output = %q, want fresh download", got)
 	}
 }
 

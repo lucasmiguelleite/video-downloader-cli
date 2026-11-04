@@ -13,6 +13,16 @@ import (
 type Manifest struct {
 	Segments  []string `json:"segments"`
 	Completed int      `json:"completed"`
+	// Bytes is the durable output size after Completed segments.
+	Bytes int64 `json:"bytes"`
+}
+
+// ValidOutput reports whether outputPath still has exactly the bytes recorded
+// by the manifest. A mismatch means a partial download was altered and must
+// be restarted rather than resumed.
+func (m *Manifest) ValidOutput(outputPath string) bool {
+	info, err := os.Stat(outputPath)
+	return err == nil && info.Mode().IsRegular() && info.Size() == m.Bytes
 }
 
 // LoadManifest reads a resume manifest from path. It returns (nil, nil) when

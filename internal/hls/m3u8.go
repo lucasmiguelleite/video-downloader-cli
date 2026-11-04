@@ -2,24 +2,32 @@ package hls
 
 import (
 	"bufio"
+	"fmt"
 	"net/url"
 	"strings"
 )
 
+// IsMasterPlaylist reports whether playlist declares stream variants.
 func IsMasterPlaylist(playlist string) bool {
 	return strings.Contains(playlist, "#EXT-X-STREAM-INF")
 }
 
+// Variant identifies a stream rendition in a master playlist.
 type Variant struct {
 	Resolution string
 	URL        string
 }
 
-func ParseVariants(baseURL, playlist string) []Variant {
+// ParseVariants parses the variants in a master playlist and resolves their
+// URLs relative to baseURL.
+func ParseVariants(baseURL, playlist string) ([]Variant, error) {
 	var variants []Variant
 	var currentRes string
 
-	base, _ := url.Parse(baseURL)
+	base, err := parseBaseURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
 
 	scanner := bufio.NewScanner(strings.NewReader(playlist))
 	for scanner.Scan() {
@@ -34,35 +42,51 @@ func ParseVariants(baseURL, playlist string) []Variant {
 			continue
 		}
 
+		resolved, err := resolveURL(base, line)
+		if err != nil {
+			return nil, err
+		}
 		variants = append(variants, Variant{
 			Resolution: currentRes,
-			URL:        resolveURL(base, line),
+			URL:        resolved,
 		})
 	}
-
-	return variants
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan master playlist: %w", err)
+	}
+	return variants, nil
 }
 
-func SelectVariant(baseURL, playlist, quality string) string {
-	variants := ParseVariants(baseURL, playlist)
+// SelectVariant returns the URL matching quality, or the first variant when
+// an exact match is unavailable.
+func SelectVariant(baseURL, playlist, quality string) (string, error) {
+	variants, err := ParseVariants(baseURL, playlist)
+	if err != nil {
+		return "", err
+	}
 
 	for _, v := range variants {
 		if strings.Contains(v.Resolution, quality) || strings.HasSuffix(v.Resolution, "x"+strings.TrimSuffix(quality, "p")) {
-			return v.URL
+			return v.URL, nil
 		}
 	}
 
 	if len(variants) > 0 {
-		return variants[0].URL
+		return variants[0].URL, nil
 	}
 
-	return ""
+	return "", nil
 }
 
-func ParseSegments(baseURL, playlist string) []string {
+// ParseSegments parses a media playlist and resolves segment URLs relative to
+// baseURL.
+func ParseSegments(baseURL, playlist string) ([]string, error) {
 	var segments []string
 
-	base, _ := url.Parse(baseURL)
+	base, err := parseBaseURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
 
 	scanner := bufio.NewScanner(strings.NewReader(playlist))
 	for scanner.Scan() {
@@ -72,10 +96,16 @@ func ParseSegments(baseURL, playlist string) []string {
 			continue
 		}
 
-		segments = append(segments, resolveURL(base, line))
+		resolved, err := resolveURL(base, line)
+		if err != nil {
+			return nil, err
+		}
+		segments = append(segments, resolved)
 	}
-
-	return segments
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan media playlist: %w", err)
+	}
+	return segments, nil
 }
 
 func extractResolution(tag string) string {
@@ -87,13 +117,21 @@ func extractResolution(tag string) string {
 	return ""
 }
 
-func resolveURL(base *url.URL, ref string) string {
-	if strings.HasPrefix(ref, "http") {
-		return ref
+func parseBaseURL(rawURL string) (*url.URL, error) {
+	base, err := url.Parse(rawURL)
+	if err != nil || !base.IsAbs() || base.Host == "" {
+		return nil, fmt.Errorf("invalid playlist base URL %q", rawURL)
 	}
+	return base, nil
+}
+
+func resolveURL(base *url.URL, ref string) (string, error) {
 	resolved, err := base.Parse(ref)
 	if err != nil {
-		return ref
+		return "", fmt.Errorf("resolve playlist URL %q: %w", ref, err)
 	}
-	return resolved.String()
+	if !resolved.IsAbs() || resolved.Host == "" {
+		return "", fmt.Errorf("resolved playlist URL %q is not absolute", ref)
+	}
+	return resolved.String(), nil
 }
