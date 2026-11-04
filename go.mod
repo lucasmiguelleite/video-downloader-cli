@@ -1,6 +1,6 @@
 module youtube-downloader
 
-go 1.26.2
+go 1.26.10
 
 require (
 	github.com/kkdai/youtube/v2 v2.10.6
@@ -17,5 +17,5 @@ require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/term v0.28.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 )
