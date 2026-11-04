@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -99,7 +100,7 @@ func (api *RealAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, 
 	return string(data), nil
 }
 
-func (api *RealAPI) FetchSegment(ctx context.Context, url string) ([]byte, error) {
+func (api *RealAPI) FetchSegment(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -108,11 +109,14 @@ func (api *RealAPI) FetchSegment(ctx context.Context, url string) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("kick segment fetch returned HTTP %d for %s", resp.StatusCode, url)
 	}
-
-	return httpbody.Read(resp.Body, maxResponseBytes)
+	body, err := httpbody.Limit(resp.Body, maxResponseBytes)
+	if err != nil {
+		_ = resp.Body.Close()
+		return nil, err
+	}
+	return body, nil
 }

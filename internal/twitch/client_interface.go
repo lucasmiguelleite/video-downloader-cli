@@ -1,6 +1,9 @@
 package twitch
 
-import "context"
+import (
+	"context"
+	"io"
+)
 
 // VideoInfo contains Twitch metadata needed for a VOD download.
 type VideoInfo struct {
@@ -18,5 +21,5 @@ type TwitchAPI interface {
 	FetchVideoInfo(ctx context.Context, videoID string) (*VideoInfo, error)
 	FetchAccessToken(ctx context.Context, videoID string) (*AccessToken, error)
 	FetchPlaylist(ctx context.Context, m3u8URL string) (string, error)
-	FetchSegment(ctx context.Context, url string) ([]byte, error)
+	FetchSegment(ctx context.Context, url string) (io.ReadCloser, error)
 }

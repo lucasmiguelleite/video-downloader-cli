@@ -2,11 +2,14 @@ package twitch
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"youtube-downloader/internal/httpbody"
 )
 
 func TestRealAPI_FetchSegment(t *testing.T) {
@@ -19,9 +22,39 @@ func TestRealAPI_FetchSegment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchSegment: %v", err)
 	}
-	if string(segment) != "segment" {
-		t.Errorf("segment = %q", segment)
+	t.Cleanup(func() { _ = segment.Close() })
+	data, err := io.ReadAll(segment)
+	if err != nil {
+		t.Fatal(err)
 	}
+	if string(data) != "segment" {
+		t.Errorf("segment = %q", data)
+	}
+}
+
+func TestRealAPI_FetchSegmentRejectsOversizedStream(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.CopyN(w, zeroReader{}, maxResponseBytes+1)
+	}))
+	t.Cleanup(server.Close)
+	body, err := NewRealAPIWithHTTPClient(server.Client()).FetchSegment(context.Background(), server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = body.Close() })
+	_, err = io.Copy(io.Discard, body)
+	if !errors.Is(err, httpbody.ErrResponseTooLarge) {
+		t.Fatalf("expected ErrResponseTooLarge, got %v", err)
+	}
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
 }
 
 func TestRealAPI_FetchSegmentRejectsRedirectStatus(t *testing.T) {

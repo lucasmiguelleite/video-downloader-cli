@@ -1,8 +1,10 @@
 package hls
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,8 +17,8 @@ import (
 )
 
 func writeFetch(data map[string][]byte) SegmentFetcher {
-	return func(ctx context.Context, url string) ([]byte, error) {
-		return data[url], nil
+	return func(ctx context.Context, url string) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(data[url])), nil
 	}
 }
 
@@ -64,11 +66,11 @@ func TestFetchSegments_ReturnsFetchError(t *testing.T) {
 	segments := []string{"https://cdn.example.com/seg1.ts", "https://cdn.example.com/bad.ts"}
 	errSentinel := errors.New("boom")
 
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		if url == "https://cdn.example.com/bad.ts" {
 			return nil, errSentinel
 		}
-		return []byte("ok"), nil
+		return io.NopCloser(strings.NewReader("ok")), nil
 	}
 
 	path := filepath.Join(t.TempDir(), "out.ts")
@@ -88,13 +90,13 @@ func TestFetchSegments_ReturnsFetchError(t *testing.T) {
 func TestFetchSegments_RespectsContextCancellation(t *testing.T) {
 	segments := []string{"https://cdn.example.com/seg1.ts", "https://cdn.example.com/seg2.ts"}
 
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 		}
-		return []byte("data"), nil
+		return io.NopCloser(strings.NewReader("data")), nil
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,7 +121,7 @@ func TestFetchSegments_ConcurrencyOneIsSequential(t *testing.T) {
 	var maxInflight int32
 	var mu sync.Mutex
 
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		cur := atomic.AddInt32(&inflight, 1)
 		mu.Lock()
 		if cur > maxInflight {
@@ -128,7 +130,7 @@ func TestFetchSegments_ConcurrencyOneIsSequential(t *testing.T) {
 		mu.Unlock()
 		time.Sleep(5 * time.Millisecond)
 		atomic.AddInt32(&inflight, -1)
-		return []byte("x"), nil
+		return io.NopCloser(strings.NewReader("x")), nil
 	}
 
 	path := filepath.Join(t.TempDir(), "out.ts")
@@ -156,7 +158,7 @@ func TestFetchSegments_ConcurrencyBoundedToN(t *testing.T) {
 	var maxInflight int32
 	var mu sync.Mutex
 
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		cur := atomic.AddInt32(&inflight, 1)
 		mu.Lock()
 		if cur > maxInflight {
@@ -165,7 +167,7 @@ func TestFetchSegments_ConcurrencyBoundedToN(t *testing.T) {
 		mu.Unlock()
 		time.Sleep(10 * time.Millisecond)
 		atomic.AddInt32(&inflight, -1)
-		return []byte("x"), nil
+		return io.NopCloser(strings.NewReader("x")), nil
 	}
 
 	path := filepath.Join(t.TempDir(), "out.ts")
@@ -179,7 +181,7 @@ func TestFetchSegments_ConcurrencyBoundedToN(t *testing.T) {
 }
 
 func TestFetchSegments_EmptySegmentList(t *testing.T) {
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		t.Error("fetch should not be called for empty segment list")
 		return nil, nil
 	}
@@ -214,6 +216,59 @@ func TestFetchSegments_RetriesTransientSegmentFailure(t *testing.T) {
 	if string(got) != "flakystable" {
 		t.Errorf("expected 'flakystable', got %q", string(got))
 	}
+}
+
+func TestFetchSegments_ClosesSegmentBodies(t *testing.T) {
+	var closed atomic.Int32
+	fetch := func(context.Context, string) (io.ReadCloser, error) {
+		return &trackingReadCloser{Reader: strings.NewReader("segment"), closed: &closed}, nil
+	}
+	path := filepath.Join(t.TempDir(), "out.ts")
+	if err := FetchSegments(context.Background(), []string{"segment"}, FetchOptions{Fetch: fetch}, path); err != nil {
+		t.Fatal(err)
+	}
+	if closed.Load() != 1 {
+		t.Errorf("closed bodies = %d", closed.Load())
+	}
+}
+
+func TestFetchSegments_RetriesStreamingFailureWithFreshFile(t *testing.T) {
+	var attempts atomic.Int32
+	fetch := func(context.Context, string) (io.ReadCloser, error) {
+		if attempts.Add(1) == 1 {
+			return io.NopCloser(io.MultiReader(strings.NewReader("partial"), errorReader{})), nil
+		}
+		return io.NopCloser(strings.NewReader("complete")), nil
+	}
+	cfg := downloader.RetryConfig{Base: time.Millisecond, Max: time.Millisecond}
+	path := filepath.Join(t.TempDir(), "out.ts")
+	err := FetchSegments(context.Background(), []string{"segment"}, FetchOptions{
+		Fetch: fetch, RetryAttempts: 2, RetryConfig: &cfg,
+	}, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "complete" {
+		t.Errorf("output = %q", got)
+	}
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed *atomic.Int32
+}
+
+type errorReader struct{}
+
+func (errorReader) Read([]byte) (int, error) { return 0, errors.New("stream failed") }
+
+func (r *trackingReadCloser) Close() error {
+	r.closed.Add(1)
+	return nil
 }
 
 // TestFetchSegments_FreshDownloadDeletesSidecar verifies that on a successful
@@ -267,11 +322,11 @@ func TestFetchSegments_ResumeSkipsCompletedSegments(t *testing.T) {
 	// Track which segments get fetched.
 	var fetched []string
 	var mu sync.Mutex
-	fetch := func(ctx context.Context, url string) ([]byte, error) {
+	fetch := func(ctx context.Context, url string) (io.ReadCloser, error) {
 		mu.Lock()
 		fetched = append(fetched, url)
 		mu.Unlock()
-		return data[url], nil
+		return io.NopCloser(bytes.NewReader(data[url])), nil
 	}
 
 	if err := FetchSegments(context.Background(), segments, FetchOptions{Concurrency: 2, Fetch: fetch}, path); err != nil {
@@ -394,7 +449,7 @@ func newFlakyFetch(payloads map[string][]byte, failFirst map[string]int) Segment
 	for k, v := range failFirst {
 		remaining[k] = v
 	}
-	return func(ctx context.Context, url string) ([]byte, error) {
+	return func(ctx context.Context, url string) (io.ReadCloser, error) {
 		mu.Lock()
 		left := remaining[url]
 		if left > 0 {
@@ -404,6 +459,6 @@ func newFlakyFetch(payloads map[string][]byte, failFirst map[string]int) Segment
 		if left > 0 {
 			return nil, errors.New("flaky transient failure")
 		}
-		return payloads[url], nil
+		return io.NopCloser(bytes.NewReader(payloads[url])), nil
 	}
 }

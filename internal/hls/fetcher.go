@@ -14,8 +14,8 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-// SegmentFetcher downloads a single HLS segment and returns its raw bytes.
-type SegmentFetcher func(ctx context.Context, url string) ([]byte, error)
+// SegmentFetcher opens a streaming HLS segment response.
+type SegmentFetcher func(ctx context.Context, url string) (io.ReadCloser, error)
 
 // FetchOptions configures FetchSegments.
 type FetchOptions struct {
@@ -158,10 +158,8 @@ func fetchAndStageBatch(ctx context.Context, segments []string, opts FetchOption
 		wg.Add(1)
 		go func(index int, rawURL string) {
 			defer wg.Done()
-			data, err := fetchSegmentWithRetry(ctx, rawURL, opts)
-			if err == nil {
-				paths[index], err = writeSegmentFile(outputPath, data)
-			}
+			var err error
+			paths[index], err = stageSegmentWithRetry(ctx, rawURL, outputPath, opts)
 			if err != nil {
 				mu.Lock()
 				if firstErr == nil {
@@ -180,19 +178,34 @@ func fetchAndStageBatch(ctx context.Context, segments []string, opts FetchOption
 	return paths, nil
 }
 
-func fetchSegmentWithRetry(ctx context.Context, rawURL string, opts FetchOptions) ([]byte, error) {
-	var data []byte
+func stageSegmentWithRetry(ctx context.Context, rawURL, outputPath string, opts FetchOptions) (string, error) {
+	var stagedPath string
 	retry := func() error {
-		var err error
-		data, err = opts.Fetch(ctx, rawURL)
-		return err
+		body, err := opts.Fetch(ctx, rawURL)
+		if err != nil {
+			if body != nil {
+				_ = body.Close()
+			}
+			return err
+		}
+		path, copyErr := writeSegmentStream(outputPath, body)
+		closeErr := body.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			_ = os.Remove(path)
+			return fmt.Errorf("close segment response %s: %w", rawURL, closeErr)
+		}
+		stagedPath = path
+		return nil
 	}
 	if opts.RetryConfig != nil {
 		err := downloader.WithRetryConfig(ctx, opts.RetryAttempts, *opts.RetryConfig, retry)
-		return data, err
+		return stagedPath, err
 	}
 	err := downloader.WithRetry(ctx, opts.RetryAttempts, retry)
-	return data, err
+	return stagedPath, err
 }
 
 func (s *fetchState) appendBatch(paths []string, bar *progressbar.ProgressBar) error {
@@ -231,19 +244,19 @@ func cleanupSegmentFiles(paths []string) {
 	}
 }
 
-func writeSegmentFile(outputPath string, data []byte) (string, error) {
+func writeSegmentStream(outputPath string, body io.Reader) (string, error) {
 	f, err := os.CreateTemp(filepath.Dir(outputPath), ".segment-*")
 	if err != nil {
 		return "", err
 	}
 	path := f.Name()
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		os.Remove(path)
-		return "", err
+	if _, err := io.Copy(f, body); err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return "", fmt.Errorf("stream segment to %q: %w", path, err)
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(path)
+		_ = os.Remove(path)
 		return "", err
 	}
 	return path, nil

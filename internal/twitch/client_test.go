@@ -1,9 +1,12 @@
 package twitch
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"youtube-downloader/internal/downloader"
@@ -37,11 +40,11 @@ func (m *mockAPI) FetchPlaylist(ctx context.Context, m3u8URL string) (string, er
 	return "", nil
 }
 
-func (m *mockAPI) FetchSegment(ctx context.Context, url string) ([]byte, error) {
+func (m *mockAPI) FetchSegment(ctx context.Context, url string) (io.ReadCloser, error) {
 	if data, ok := m.segments[url]; ok {
-		return data, nil
+		return io.NopCloser(bytes.NewReader(data)), nil
 	}
-	return []byte("segment-data"), nil
+	return io.NopCloser(strings.NewReader("segment-data")), nil
 }
 
 func TestGetVideo(t *testing.T) {
