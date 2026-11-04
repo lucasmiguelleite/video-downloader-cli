@@ -59,7 +59,7 @@ func TestDownloaderUseCase(t *testing.T) {
 
 // TestDownloaderUseCase_CancellationKeepsPartialFile verifies that when the
 // download is cancelled (Ctrl+C), the partial file is kept on disk and the
-// use case returns its path rather than an error.
+// use case returns its path and a distinct interruption error.
 func TestDownloaderUseCase_CancellationKeepsPartialFile(t *testing.T) {
 	dir := t.TempDir()
 
@@ -81,8 +81,11 @@ func TestDownloaderUseCase_CancellationKeepsPartialFile(t *testing.T) {
 
 	path, err := uc.Execute(context.Background(), "url", "720p")
 
-	if err != nil {
-		t.Fatalf("expected no error on cancellation, got: %v", err)
+	if !errors.Is(err, ErrDownloadInterrupted) {
+		t.Fatalf("expected ErrDownloadInterrupted, got: %v", err)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected wrapped context.Canceled, got: %v", err)
 	}
 	expectedPath := filepath.Join(dir, "test.mp4")
 	if path != expectedPath {

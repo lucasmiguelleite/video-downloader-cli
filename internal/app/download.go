@@ -3,12 +3,16 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 
 	"youtube-downloader/internal/downloader"
 	"youtube-downloader/internal/fs"
 )
+
+// ErrDownloadInterrupted identifies a download stopped by context cancellation.
+var ErrDownloadInterrupted = errors.New("download interrupted")
 
 // DownloadUseCase coordinates video resolution, download, and optional remux.
 type DownloadUseCase struct {
@@ -70,11 +74,9 @@ func (uc *DownloadUseCase) Execute(ctx context.Context, url, quality string) (st
 	uc.log.Info("download starting", "title", video.Title, "dir", dir, "quality", quality)
 
 	if err := uc.service.Download(ctx, video, quality, path); err != nil {
-		// Graceful shutdown: on cancellation, keep the partial file so the
-		// user can re-run to resume. Report the path rather than an error.
 		if errors.Is(err, context.Canceled) {
 			uc.log.Info("download interrupted, partial file kept — re-run to resume", "path", path)
-			return path, nil
+			return path, fmt.Errorf("%w: %w", ErrDownloadInterrupted, err)
 		}
 		uc.log.Error("download failed", "title", video.Title, "err", err)
 		return "", err

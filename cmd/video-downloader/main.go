@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -94,6 +95,10 @@ func main() {
 
 	path, err := usecase.Execute(ctx, input.URL, input.Quality)
 	if err != nil {
+		if errors.Is(err, app.ErrDownloadInterrupted) {
+			fmt.Fprintf(os.Stderr, "Download interrupted. Partial file kept at: %s\n", path)
+			os.Exit(130)
+		}
 		fmt.Println("Error downloading video:", err)
 		os.Exit(1)
 	}
