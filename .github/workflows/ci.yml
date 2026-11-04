@@ -29,7 +29,7 @@ jobs:
         run: go test -race ./...
 
       - name: Staticcheck
-        uses: dominikh/staticcheck-action@e986ce0bb60df51c6c9f5ccbf853d1b5bd1ca14c # v1
+        uses: dominikh/staticcheck-action@9716614d4101e79b4340dd97b10e54d68234e431 # v1
         with:
           version: "2025.1.1"
           install-go: false
